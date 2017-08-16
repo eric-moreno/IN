@@ -268,17 +268,14 @@ def h5_to_df(fname, jet_dict_file = None):
     print "Generate dictionary"
     types = sorted(list(set(df.parents.values)))
     if jet_dict_file == None:
-        try:
-            jet_dict = cPickle.load(open('jet_dict.pkl', 'rb')) 
-        except:
-            jet_dict = {}
-            for i in types:
-                #l = int(raw_input(i + ": "))
-                j = ast.literal_eval(i)
-                l = type_func.get_type(j)
-                print j, l
-                jet_dict[i] = l
-            cPickle.dump(jet_dict, open('jet_dict.pkl', 'wb'))
+        jet_dict = {}
+        for i in types:
+            #l = int(raw_input(i + ": "))
+            j = ast.literal_eval(i)
+            l = type_func.get_type(j)
+            print j, l
+            jet_dict[i] = l
+        cPickle.dump(jet_dict, open('jet_dict.pkl', 'wb'))
     else:
         jet_dict = cPickle.load(open(jet_dict_file, 'rb'))
     print "Assigning jet_type..."

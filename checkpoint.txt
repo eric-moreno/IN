@@ -1,0 +1,6 @@
+training
+target
+val
+val_target
+[10, 4, 1, 5, 6, 10, 10, 10, 5, 5, 5]
+gnn_file
