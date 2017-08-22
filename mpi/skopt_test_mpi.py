@@ -119,9 +119,9 @@ else:
         if tag == START:
             print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -e %s -a %s -p %s -t" % (n_epochs, 
+            com = "python graph_train.py -e %s -a %s -p %s" % (n_epochs, 
                                                                ' '.join([str(i) for i in task]), 
-                                                               '/bigdata/shared/HepSIM/')
+                                                               path)
             print ("Will execute the command: ", com)
             code = os.system(com)
             ## is there a way to catch that single.py exited without running a single epoch ? yes exit code 123
