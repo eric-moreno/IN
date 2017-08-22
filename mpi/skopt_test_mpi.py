@@ -23,31 +23,55 @@ EXIT=2
 START=3
 NOTRAIN=4
 
-import cPickle as pickle
+import pickle
+import argparse
+parser = argparse.ArgumentParser(description='Get GNN parameters or saved state.')
 
-def save_state():
+parser.add_argument('--path',
+                    '-p',
+                    dest ='path',
+                    action = 'store',
+                    default = ['/bigdata/shared/HepSIM/'],
+                    type=str,
+                    nargs = 1)
+
+parser.add_argument('--epoch',
+                    '-e',
+                    dest ='epoch',
+                    action='store',
+                    default = [1],
+                    type=int,
+                    nargs = 1)
+
+def save_state(path, optimizer, unfinished):
     dic = {'optimizer': optimizer,
            'unfinished': unfinished}
-    pickle.dump(dic, open('save.pkl', 'wb'))
+    pickle.dump(dic, open(path + '_tmp', 'wb'))
+    os.rename(path + '_tmp', path)
     
 def load_state(path):
     if os.path.exists(path):
-        dic = pickle.load(open('save.pkl', 'rb'))
+        dic = pickle.load(open(path, 'rb'))
         optimizer, unfinished = dic['optimizer'], dic['unfinished']
     else:
         optimizer = Optimizer(
                         base_estimator=GaussianProcessRegressor(),
-                        dimensions=[Integer(5, 20) for i in range(8)])
+                        dimensions=[Integer(5, 20) for i in range(8)], acq_optimizer='sampling')
         unfinished = []
     return optimizer, unfinished
 
-def get_path(data):
-    return "/bigdata/shared/HepSIM/checkpoints/" + "-".join([str(i) for i in data]) + '/'
+def get_path(data, checkpoint_path):
+    print(checkpoint_path)
+    return checkpoint_path + "-".join([str(i) for i in data]) + '/'
 
 diff = lambda l1,l2: filter(lambda x: x not in l2, l1)
 
+args = parser.parse_args()
+n_epochs = args.epoch[0]
+path = args.path[0]
+checkpoint_path = path + 'checkpoints/'
 if rank == 0:
-    optimizer, unfinished = load_state('save.pkl')
+    optimizer, unfinished = load_state(checkpoint_path + 'optimizer.pkl')
     working = []
     num_workers = size - 1 # remove the master
     closed_workers = 0
@@ -66,25 +90,21 @@ if rank == 0:
             else: 
                 task = l[0]
             working.append(task)
-            save_state()
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished)
             comm.send(task, dest=source, tag=START)
             print("Sending task %s to worker %d at %s"% (task, source, time.asctime(time.localtime())))
         elif tag == DONE:
             print("Got data %s from worker %d at %s" %(data, source, time.asctime(time.localtime())))
             unfinished.remove(data)
             working.remove(data)
-            checkpoint = get_path(data) + 'best_checkpoint.txt'
+            checkpoint = get_path(data, checkpoint_path) + 'best_checkpoint.txt'
             inf = open(checkpoint,'r')
-            file_dict, args, val_acc_vals, done_str = [i.strip() for i in inf.readlines()]
+            _, _, val_acc_vals, _ = [i.strip() for i in inf.readlines()]
             inf.close()
-            file_name_dict = ast.literal_eval(file_dict)
             val_acc_vals = np.array(ast.literal_eval(val_acc_vals))
             print("Telling optimizer input: %s \n resulting in output: %s" % (data, 100. - max(val_acc_vals)))
             optimizer.tell(data, 100. - max(val_acc_vals))
-            save_state()
-        elif tag == NOTRAIN:
-            result = data
-            print ("Worker %d considers %d as done at %s"%(source , result,time.asctime(time.localtime())))
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished)
         elif tag == EXIT:
             print("Worker %d exited at %s" % (source,time.asctime(time.localtime())))
             closed_workers += 1
@@ -99,8 +119,9 @@ else:
         if tag == START:
             print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -a %s -p %s" % (' '.join([str(i) for i in task]), 
-                                                         '/bigdata/shared/HepSIM/')
+            com = "python graph_train.py -e %s -a %s -p %s -t" % (n_epochs, 
+                                                               ' '.join([str(i) for i in task]), 
+                                                               '/bigdata/shared/HepSIM/')
             print ("Will execute the command: ", com)
             code = os.system(com)
             ## is there a way to catch that single.py exited without running a single epoch ? yes exit code 123
