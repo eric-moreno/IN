@@ -39,26 +39,27 @@ parser.add_argument('--epoch',
                     type=int,
                     nargs = 1)
 
-parser.add_argument('--test',
-                    '-t',
-                    dest ='test',
-                    action='store',
-                    default = [0],
-                    const = [1],
-                    type=int,
-                    nargs = '?')
-
 parser.add_argument('--kfold',
                     '-k',
                     dest = 'kfold',
                     type = int)
+
+parser.add_argument('--kmax',
+                    '-m',
+                    dest = 'kfold_max',
+                    type = int)
+
+parser.add_argument('--test',
+                    '-t',
+                    dest='test',
+                    action = 'store_true')
 
 parser.add_argument('--gpu',  #Use CPU unless I receive this flag
                     '-g',
                     dest = 'gpu',
                     action = 'store_true'
                     ) 
-parser.set_defaults(gpu = False)
+parser.set_defaults(test = False, kfold_max = 10, gpu = False)
 
 def write_checkpoint(out, file_name_dict, gnn, optimizer, 
                      args, val_acc_vals, done, kfold, 
@@ -92,20 +93,20 @@ def write_checkpoint(out, file_name_dict, gnn, optimizer,
     os.rename(file_name_dict['optimizer'] + '_tmp', file_name_dict['optimizer'])
     
     
-def get_training(path, kfold):
+def get_training(path, kfold, kfold_max):
     training = torch.load(path + 'training.torch')
-    chunks = list(torch.chunk(training, 10))
+    chunks = list(torch.chunk(training, kfold_max))
     val = chunks[kfold]
     chunks.pop(kfold)
     training = torch.cat(chunks)
     target = torch.load(path + 'target.torch')
-    chunks = list(torch.chunk(target, 10))
+    chunks = list(torch.chunk(target, kfold_max))
     val_target = chunks[kfold]
     chunks.pop(kfold)
     target = torch.cat(chunks)
     return training, target, val, val_target
 
-def read_checkpoint(checkpoint, kfold, gpu):
+def read_checkpoint(checkpoint, kfold, kfold_max, gpu):
     in_json  = open(checkpoint, 'r')
     in_dict = json.load(in_json)
     file_name_dict = in_dict['file_name_dict']
@@ -113,7 +114,7 @@ def read_checkpoint(checkpoint, kfold, gpu):
     args = in_dict['args']
     done = in_dict['done']
     N, n_targets, P, De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = args
-    training, target, val, val_target = get_training(file_name_dict['training_path'], kfold)
+    training, target, val, val_target = get_training(file_name_dict['training_path'], kfold, kfold_max)
     gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2, use_gpu = gpu)
     gnn.load_state_dict(torch.load(file_name_dict['gnn']))
     optimizer = optim.Adam(gnn.parameters())
@@ -195,9 +196,10 @@ def train_epoch(trainingv, targetv, valv, val_targetv, gpu = False):
 
 done = False
 args = parser.parse_args()
-test = args.test[0]
+test = args.test
 graph_args = args.args
 kfold = args.kfold
+kfold_max = args.kfold_max
 gpu = args.gpu
 path = args.path[0]
 n_epochs = args.epoch[0]
@@ -208,14 +210,14 @@ file_name_dict = {i: arg_dir + i + '.torch' for i in ['gnn',
                                                       'optimizer']}
 best_name_dict = {i: arg_dir + 'best_' + i + '.torch' for i in file_name_dict.keys()}
 file_name_dict['training_path'] = path + 'training/'
-if test == 1:
+if test:
     write_test_value(best_checkpoint, graph_args, kfold)
 else: 
     batch_size = 500
     if os.path.exists(checkpoint):
         print("Resuming from checkpoint located at %s" % checkpoint)
         gnn, optimizer, trainingv, targetv, valv, val_targetv, \
-        file_name_dict, val_acc_vals, done = read_checkpoint(checkpoint, kfold, gpu)
+        file_name_dict, val_acc_vals, done = read_checkpoint(checkpoint, kfold, kfold_max, gpu)
         if done:
             print ("Already finished, not sure why you asked me to do this again.")
         else:
@@ -247,7 +249,7 @@ else:
         val_acc_vals = np.array([])
         De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = graph_args
         trainingv, targetv, valv, val_targetv = get_training(file_name_dict['training_path'], 
-                                                             kfold)
+                                                             kfold, kfold_max)
         N = int(trainingv.size()[2])
         P = int(trainingv.size()[1])
         n_targets = int(max(targetv.data.numpy())) + 1

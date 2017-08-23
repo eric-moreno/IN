@@ -48,7 +48,19 @@ parser.add_argument('--restart',
                     dest = 'restart',
                     action = 'store_true'
                     )
-parser.set_defaults(restart = False)
+
+parser.add_argument('--kfold',
+                    '-k',
+                    dest='kfold',
+                    type = int, 
+                    action = 'store')
+
+parser.add_argument('--test',
+                    '-t',
+                    dest='test',
+                    action = 'store_true')
+
+parser.set_defaults(restart = False, kfold = 10, test = False)
 
 def save_state(path, optimizer, unfinished, finished, reported):
     dic = {'optimizer': optimizer,
@@ -87,11 +99,12 @@ args = parser.parse_args()
 n_epochs = args.epoch[0]
 path = args.path[0]
 restart = args.restart
+test = args.test
 checkpoint_path = path + 'checkpoints/'
+kfolds = args.kfold
 if rank == 0:
     if restart:
         shutil.rmtree(checkpoint_path)
-    kfolds = 10
     if not os.path.isdir(checkpoint_path):
         os.makedirs(checkpoint_path)
     optimizer, unfinished, finished, reported = load_state(checkpoint_path + 'optimizer.pkl')
@@ -121,9 +134,9 @@ if rank == 0:
             working.append(task)
             save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished, reported)
             comm.send(task, dest=source, tag=START)
-            #print("Sending task %s to worker %d at %s" % (task, source, time.asctime(time.localtime())))
+            print("Sending task %s to worker %d at %s" % (task, source, time.asctime(time.localtime())))
         elif tag == DONE:
-            #print("Got data %s from worker %d at %s" % (data, source, time.asctime(time.localtime())))
+            print("Got data %s from worker %d at %s" % (data, source, time.asctime(time.localtime())))
             graph_args, k = data
             if data in unfinished:
                 unfinished.remove(data)
@@ -155,13 +168,15 @@ else:
         args, k = task
         tag = status.Get_tag()
         if tag == START:
-           # print ("Received parameters ",task,"to operate on")
+            print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -e %s -a %s -p %s -k %s " % (n_epochs, 
-                                                                     ' '.join([str(i) for i in args]), 
-                                                                     path,
-                                                                     k)
-           # print ("Will execute the command: ", com)
+            com = "python graph_train.py -e %s -a %s -p %s -k %s -m %s" % (n_epochs, 
+                                                                           ' '.join([str(i) for i in args]), 
+                                                                           path,
+                                                                           k, kfolds)
+            if test:
+                com += ' -t'
+            print ("Will execute the command: ", com)
             code = os.system(com)
             ## is there a way to catch that single.py exited without running a single epoch ? yes exit code 123
             comm.send(task, dest=0, tag=DONE)
