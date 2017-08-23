@@ -94,11 +94,15 @@ def write_checkpoint(out, file_name_dict, gnn, optimizer,
     
 def get_training(path, kfold):
     training = torch.load(path + 'training.torch')
-    training = torch.chunk(training, 10)[kfold]
+    chunks = list(torch.chunk(training, 10))
+    val = chunks[kfold]
+    chunks.pop(kfold)
+    training = torch.cat(chunks)
     target = torch.load(path + 'target.torch')
-    target = torch.chunk(target, 10)[kfold]
-    val = torch.load(path + 'val.torch')
-    val_target = torch.load(path + 'val_target.torch')
+    chunks = list(torch.chunk(target, 10))
+    val_target = chunks[kfold]
+    chunks.pop(kfold)
+    target = torch.cat(chunks)
     return training, target, val, val_target
 
 def read_checkpoint(checkpoint, kfold, gpu):
@@ -181,7 +185,7 @@ def train_epoch(trainingv, targetv, valv, val_targetv, gpu = False):
     for j in torch.split(valv, 100):
         if gpu:
             j = j.cuda()
-            a = gnn(j.cuda()).cpu().data.numpy()
+            a = gnn(j).cpu().data.numpy()
         else:
             a = gnn(j).data.numpy()
         lst.append(a)

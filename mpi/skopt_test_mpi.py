@@ -157,7 +157,7 @@ else:
         if tag == START:
            # print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -e %s -a %s -p %s -k %s -t" % (n_epochs, 
+            com = "python graph_train.py -e %s -a %s -p %s -k %s " % (n_epochs, 
                                                                      ' '.join([str(i) for i in args]), 
                                                                      path,
                                                                      k)
