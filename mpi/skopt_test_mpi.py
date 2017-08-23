@@ -24,7 +24,7 @@ START=3
 NOTRAIN=4
 
 import pickle
-import argparse
+import argparse, json
 parser = argparse.ArgumentParser(description='Get GNN parameters or saved state.')
 
 parser.add_argument('--path',
@@ -48,6 +48,12 @@ def save_state(path, optimizer, unfinished):
            'unfinished': unfinished}
     pickle.dump(dic, open(path + '_tmp', 'wb'))
     os.rename(path + '_tmp', path)
+
+def open_checkpoint(checkpoint):
+    in_json  = open(checkpoint, 'r')
+    in_dict = json.load(in_json)
+    val_acc_vals = np.array(in_dict['val_acc_vals'])
+    return val_acc_vals
     
 def load_state(path):
     if os.path.exists(path):
@@ -70,6 +76,9 @@ args = parser.parse_args()
 n_epochs = args.epoch[0]
 path = args.path[0]
 checkpoint_path = path + 'checkpoints/'
+kfolds = 10
+if not os.path.isdir(checkpoint_path):
+    os.makedirs(checkpoint_path)
 if rank == 0:
     optimizer, unfinished = load_state(checkpoint_path + 'optimizer.pkl')
     working = []
@@ -85,8 +94,10 @@ if rank == 0:
             ### keep on running until running out of time
             l = diff(unfinished, working)
             if l == []:
-                task = optimizer.ask()
-                unfinished.append(task)
+                new_task = optimizer.ask()
+                task_fold = [(new_task, i) for i in range(kfolds)]
+                unfinished += task_fold
+                task = unfinished[0]
             else: 
                 task = l[0]
             working.append(task)
@@ -95,15 +106,13 @@ if rank == 0:
             print("Sending task %s to worker %d at %s"% (task, source, time.asctime(time.localtime())))
         elif tag == DONE:
             print("Got data %s from worker %d at %s" %(data, source, time.asctime(time.localtime())))
+            graph_args, k = data
             unfinished.remove(data)
             working.remove(data)
-            checkpoint = get_path(data, checkpoint_path) + 'best_checkpoint.txt'
-            inf = open(checkpoint,'r')
-            _, _, val_acc_vals, _ = [i.strip() for i in inf.readlines()]
-            inf.close()
-            val_acc_vals = np.array(ast.literal_eval(val_acc_vals))
+            checkpoint = get_path(graph_args, checkpoint_path) + str(k) + '-best_checkpoint.json'
+            val_acc_vals = open_checkpoint(checkpoint)
             print("Telling optimizer input: %s \n resulting in output: %s" % (data, 100. - max(val_acc_vals)))
-            optimizer.tell(data, 100. - max(val_acc_vals))
+            optimizer.tell(graph_args, 100. - max(val_acc_vals))
             save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished)
         elif tag == EXIT:
             print("Worker %d exited at %s" % (source,time.asctime(time.localtime())))
@@ -115,13 +124,15 @@ else:
     while True:
         comm.send(None, dest=0, tag=READY)
         task = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+        args, k = task
         tag = status.Get_tag()
         if tag == START:
             print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -e %s -a %s -p %s" % (n_epochs, 
-                                                               ' '.join([str(i) for i in task]), 
-                                                               path)
+            com = "python graph_train.py -e %s -a %s -p %s -k %s" % (n_epochs, 
+                                                                     ' '.join([str(i) for i in args]), 
+                                                                     path,
+                                                                     k)
             print ("Will execute the command: ", com)
             code = os.system(com)
             ## is there a way to catch that single.py exited without running a single epoch ? yes exit code 123

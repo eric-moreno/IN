@@ -8,7 +8,7 @@ import torch.optim as optim
 import ast
 import numpy as np
 import mpi_util
-import os
+import os, json, time
 os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 parser = argparse.ArgumentParser(description='Get GNN parameters or saved state.')
 no_file = "NOFILE"
@@ -47,8 +47,13 @@ parser.add_argument('--test',
                     const = [1],
                     type=int,
                     nargs = '?')
+
+parser.add_argument('--kfold',
+                    '-k',
+                    dest = 'kfold',
+                    type = int)
    
-def write_checkpoint(out, file_name_dict, gnn, optimizer):
+def write_checkpoint(out, file_name_dict, gnn, optimizer, args, val_acc_vals, done, kfold, train_time):
     args = [gnn.N,
             gnn.n_targets,
             gnn.P,
@@ -60,12 +65,16 @@ def write_checkpoint(out, file_name_dict, gnn, optimizer):
             gnn.hiddenr2,
             gnn.hiddeno2,
             gnn.hiddenc2]
-    outf = open(out + '_tmp', 'w')
-    outf.write(str(file_name_dict) + '\n')
-    outf.write(str(args) + '\n')
-    outf.write(str(list(val_acc_vals)) + '\n')
-    outf.write(str(done))
-    outf.close()
+    out_dict = {'file_name_dict':file_name_dict, 
+                'args': args, 
+                'val_acc_vals': val_acc_vals.tolist(),
+                'done': done,
+                'kfold': kfold,
+                'train_time': train_time
+               }
+    json_out = open(out + '_tmp', 'w')
+    json_out.write(json.dumps(out_dict))
+    json_out.close()
     torch.save(gnn.state_dict(), file_name_dict['gnn'] + '_tmp')
     torch.save(optimizer.state_dict(), file_name_dict['optimizer'] + '_tmp')
     os.rename(out + '_tmp', out)
@@ -73,26 +82,30 @@ def write_checkpoint(out, file_name_dict, gnn, optimizer):
     os.rename(file_name_dict['optimizer'] + '_tmp', file_name_dict['optimizer'])
     
     
-def get_training(path):
+def get_training(path, kfold):
     training = torch.load(path + 'training.torch')
+    training = torch.chunk(training, 10)[kfold]
     target = torch.load(path + 'target.torch')
+    target = torch.chunk(target, 10)[kfold]
     val = torch.load(path + 'val.torch')
     val_target = torch.load(path + 'val_target.torch')
     return training, target, val, val_target
 
-def read_checkpoint(checkpoint):
-    inf = open(checkpoint, 'r')
-    file_dict, args, val_acc_vals, done_str = [i.strip() for i in inf.readlines()]
-    inf.close()
-    file_name_dict = ast.literal_eval(file_dict)
-    val_acc_vals = np.array(ast.literal_eval(val_acc_vals))
-    N, n_targets, P, De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = ast.literal_eval(args)
-    training, target, val, val_target = get_training(file_name_dict['training_path'])
+def read_checkpoint(checkpoint, kfold):
+    in_json  = open(checkpoint, 'r')
+    in_dict = json.load(in_json)
+    print(in_dict)
+    file_name_dict = in_dict['file_name_dict']
+    val_acc_vals = np.array(in_dict['val_acc_vals'])
+    args = in_dict['args']
+    done = in_dict['done']
+    N, n_targets, P, De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = args
+    training, target, val, val_target = get_training(file_name_dict['training_path'], kfold)
     gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2)
     gnn.load_state_dict(torch.load(file_name_dict['gnn']))
     optimizer = optim.Adam(gnn.parameters())
     optimizer.load_state_dict(torch.load(file_name_dict['optimizer']))
-    return gnn, optimizer, training, target, val, val_target, file_name_dict, val_acc_vals, done_str
+    return gnn, optimizer, training, target, val, val_target, file_name_dict, val_acc_vals, done
 
 def accuracy(predict, target):
     _, p_vals = torch.max(predict, 1)
@@ -156,11 +169,13 @@ done = False
 args = parser.parse_args()
 test = args.test[0]
 graph_args = args.args
+kfold = args.kfold
+print(kfold)
 path = args.path[0]
 n_epochs = args.epoch[0]
 arg_dir = get_path(graph_args, path)
-checkpoint = arg_dir + 'checkpoint.txt'
-best_checkpoint = arg_dir + 'best_checkpoint.txt'
+checkpoint = arg_dir + str(kfold) + '-checkpoint.json'
+best_checkpoint = arg_dir + str(kfold) + '-best_checkpoint.json'
 file_name_dict = {i: arg_dir + i + '.torch' for i in ['gnn',
                                                       'optimizer']}
 best_name_dict = {i: arg_dir + 'best_' + i + '.torch' for i in file_name_dict.keys()}
@@ -173,33 +188,38 @@ else:
     batch_size = 500
     if os.path.exists(checkpoint):
         print("Resuming from checkpoint located at %s" % checkpoint)
-        gnn, optimizer, training, target, val, val_target, \
-        file_name_dict, val_acc_vals, done_str = read_checkpoint(checkpoint)
-        done = ast.literal_eval(done_str)
+        gnn, optimizer, trainingv, targetv, valv, val_targetv, \
+        file_name_dict, val_acc_vals, done = read_checkpoint(checkpoint, kfold)
         if done:
             print ("Already finished, not sure why you asked me to do this again.")
         else:
             loss = nn.CrossEntropyLoss()
             for i in range(n_epochs):
                 print("Epoch %s" % i)
+                start_time = time.time() 
                 val_acc_vals = np.append(val_acc_vals, train_epoch(trainingv,
                                                                    targetv,
                                                                    valv, 
                                                                    val_targetv))
+                end_time = time.time()
+                train_time = end_time - start_time
                 if (val_acc_vals[-1] == min(val_acc_vals)):
-                    write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer)
+                    write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
+                                     args, val_acc_vals, done, kfold, train_time)
                 if early_stopping(val_acc_vals):
                     done = True
                     break
                 print
-                write_checkpoint(checkpoint, file_name_dict, gnn, optimizer)
+                write_checkpoint(checkpoint, file_name_dict, gnn, optimizer, 
+                                 args, val_acc_vals, done, kfold, train_time)
     else:
         print("No checkpoint at: %s\n Creating it." %checkpoint)
         if not os.path.isdir(arg_dir):
             os.makedirs(arg_dir)
         val_acc_vals = np.array([])
         De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = graph_args
-        trainingv, targetv, valv, val_targetv = get_training(file_name_dict['training_path'])
+        trainingv, targetv, valv, val_targetv = get_training(file_name_dict['training_path'], 
+                                                             kfold)
         N = int(trainingv.size()[2])
         P = int(trainingv.size()[1])
         n_targets = int(max(targetv.data.numpy())) + 1
@@ -208,14 +228,19 @@ else:
         loss = nn.CrossEntropyLoss()
         for i in range(n_epochs):
             print("Epoch %s" % i)
+            start_time = time.time() 
             val_acc_vals = np.append(val_acc_vals, train_epoch(trainingv,
                                                                targetv,
                                                                valv, 
                                                                val_targetv))
+            end_time = time.time()
+            train_time = end_time - start_time
             if (val_acc_vals[-1] == min(val_acc_vals)):
-                write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer)
+                write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
+                                 args, val_acc_vals, done, kfold, train_time)
             if early_stopping(val_acc_vals):
                 done = True
                 break
             print
-            write_checkpoint(checkpoint, file_name_dict, gnn, optimizer)
+            write_checkpoint(checkpoint, file_name_dict, gnn, optimizer, 
+                             args, val_acc_vals, done, kfold, train_time)
