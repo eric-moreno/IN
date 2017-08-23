@@ -14,8 +14,9 @@ class GraphNet(nn.Module):
                  params,
                  De = 5, Do = 6,
                  hiddenr1 = 10, hiddeno1 = 10, hiddenc1 = 10,
-                 hiddenr2 = 5, hiddeno2 = 5, hiddenc2 = 5):
+                 hiddenr2 = 5, hiddeno2 = 5, hiddenc2 = 5, use_gpu = False):
         super(GraphNet, self).__init__()
+        self.use_gpu = use_gpu
         self.hiddenr1 = hiddenr1
         self.hiddenr2 = hiddenr2
         self.hiddeno1 = hiddeno1
@@ -32,15 +33,25 @@ class GraphNet(nn.Module):
         self.n_targets = n_targets
         self.assign_matrices()
         self.Ra = Variable(torch.ones(self.Dr, self.Nr))
-        self.fr1 = nn.Linear(2 * self.P + self.Dr, self.hiddenr1).cuda()
-        self.fr2 = nn.Linear(self.hiddenr1, self.hiddenr2).cuda()
-        self.fr3 = nn.Linear(self.hiddenr2, self.De).cuda()
-        self.fo1 = nn.Linear(self.P + self.Dx + self.De, self.hiddeno1).cuda()
-        self.fo2 = nn.Linear(self.hiddeno1, self.hiddeno2).cuda()
-        self.fo3 = nn.Linear(self.hiddeno2, self.Do).cuda()
-        self.fc1 = nn.Linear(self.Do * self.N, self.hiddenc1).cuda()
-        self.fc2 = nn.Linear(self.hiddenc1, self.hiddenc2).cuda()
-        self.fc3 = nn.Linear(self.hiddenc2, self.n_targets).cuda()
+        self.fr1 = nn.Linear(2 * self.P + self.Dr, self.hiddenr1)
+        self.fr2 = nn.Linear(self.hiddenr1, self.hiddenr2)
+        self.fr3 = nn.Linear(self.hiddenr2, self.De)
+        self.fo1 = nn.Linear(self.P + self.Dx + self.De, self.hiddeno1)
+        self.fo2 = nn.Linear(self.hiddeno1, self.hiddeno2)
+        self.fo3 = nn.Linear(self.hiddeno2, self.Do)
+        self.fc1 = nn.Linear(self.Do * self.N, self.hiddenc1)
+        self.fc2 = nn.Linear(self.hiddenc1, self.hiddenc2)
+        self.fc3 = nn.Linear(self.hiddenc2, self.n_targets)
+        if self.use_gpu:
+            self.fr1 = self.fr1.cuda()
+            self.fr2 = self.fr2.cuda()
+            self.fr3 = self.fr3.cuda()
+            self.fo1 = self.fo1.cuda()
+            self.fo2 = self.fo2.cuda()
+            self.fo3 = self.fo3.cuda()
+            self.fc1 = self.fc1.cuda()
+            self.fc2 = self.fc2.cuda()
+            self.fc3 = self.fc3.cuda()
     
     def assign_matrices(self):
         self.Rr = torch.zeros(self.N, self.Nr)
@@ -49,8 +60,11 @@ class GraphNet(nn.Module):
         for i, (r, s) in enumerate(receiver_sender_list):
             self.Rr[r, i] = 1
             self.Rs[s, i] = 1
-        self.Rr = Variable(self.Rr).cuda()
-        self.Rs = Variable(self.Rs).cuda()
+        self.Rr = Variable(self.Rr)
+        self.Rs = Variable(self.Rs)
+        if self.use_gpu:
+            self.Rr = Variable(self.Rr).cuda()
+            self.Rs = Variable(self.Rs).cuda()
         
     def forward(self, x):
         Orr = self.tmul(x, self.Rr)
