@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import os, itertools, random, glob, time, sys, ast
+import os, itertools, random, glob, time, sys, ast, shutil
 import numpy as np
 
 ## MPI Setup
@@ -43,10 +43,18 @@ parser.add_argument('--epoch',
                     type=int,
                     nargs = 1)
 
-def save_state(path, optimizer, unfinished, finished):
+parser.add_argument('--restart',
+                    '-r',
+                    dest = 'restart',
+                    action = 'store_true'
+                    )
+parser.set_defaults(restart = False)
+
+def save_state(path, optimizer, unfinished, finished, reported):
     dic = {'optimizer': optimizer,
            'unfinished': unfinished,
-           'finished': finished}
+           'finished': finished,
+           'reported': reported}
     pickle.dump(dic, open(path + '_tmp', 'wb'))
     os.rename(path + '_tmp', path)
 
@@ -59,14 +67,16 @@ def open_checkpoint(checkpoint):
 def load_state(path):
     if os.path.exists(path):
         dic = pickle.load(open(path, 'rb'))
-        optimizer, unfinished, finished = dic['optimizer'], dic['unfinished'], dic['finished']
+        optimizer, unfinished, finished, reported = dic['optimizer'], dic['unfinished'], \
+                                                    dic['finished'], dic['reported']
     else:
         optimizer = Optimizer(
                         base_estimator=GaussianProcessRegressor(),
                         dimensions=[Integer(5, 20) for i in range(8)], acq_optimizer='sampling')
         unfinished = []
         finished = {}
-    return optimizer, unfinished, finished
+        reported = {}
+    return optimizer, unfinished, finished, reported
 
 def get_path(data, checkpoint_path):
     return checkpoint_path + "-".join([str(i) for i in data]) + '/'
@@ -76,12 +86,15 @@ diff = lambda l1,l2: filter(lambda x: x not in l2, l1)
 args = parser.parse_args()
 n_epochs = args.epoch[0]
 path = args.path[0]
+restart = args.restart
 checkpoint_path = path + 'checkpoints/'
-kfolds = 10
-if not os.path.isdir(checkpoint_path):
-    os.makedirs(checkpoint_path)
 if rank == 0:
-    optimizer, unfinished, finished = load_state(checkpoint_path + 'optimizer.pkl')
+    if restart:
+        shutil.rmtree(checkpoint_path)
+    kfolds = 10
+    if not os.path.isdir(checkpoint_path):
+        os.makedirs(checkpoint_path)
+    optimizer, unfinished, finished, reported = load_state(checkpoint_path + 'optimizer.pkl')
     working = []
     num_workers = size - 1 # remove the master
     closed_workers = 0
@@ -96,25 +109,39 @@ if rank == 0:
             l = diff(unfinished, working)
             if l == []:
                 new_task = optimizer.ask()
+                print("Starting: %s" % new_task)
+                task_path = get_path(new_task, checkpoint_path)
+                if not os.path.isdir(task_path):
+                    os.makedirs(task_path)
                 task_fold = [(new_task, i) for i in range(kfolds)]
                 unfinished += task_fold
                 task = unfinished[0]
             else: 
                 task = l[0]
             working.append(task)
-            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished)
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished, reported)
             comm.send(task, dest=source, tag=START)
-            print("Sending task %s to worker %d at %s" % (task, source, time.asctime(time.localtime())))
+            #print("Sending task %s to worker %d at %s" % (task, source, time.asctime(time.localtime())))
         elif tag == DONE:
-            print("Got data %s from worker %d at %s" % (data, source, time.asctime(time.localtime())))
+            #print("Got data %s from worker %d at %s" % (data, source, time.asctime(time.localtime())))
             graph_args, k = data
-            unfinished.remove(data)
-            working.remove(data)
-            checkpoint = get_path(graph_args, checkpoint_path) + str(k) + '-best_checkpoint.json'
-            val_acc_vals = open_checkpoint(checkpoint)
-            print("Telling optimizer input: %s \n resulting in output: %s" % (data, 100. - max(val_acc_vals)))
-            optimizer.tell(graph_args, 100. - max(val_acc_vals))
-            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished)
+            if data in unfinished:
+                unfinished.remove(data)
+                working.remove(data)
+                checkpoint = get_path(graph_args, checkpoint_path) + str(k) + '-best_checkpoint.json'
+                val_acc_vals = open_checkpoint(checkpoint)
+                inaccuracy = 100. - max(val_acc_vals)
+                graph_args_key = str(graph_args)
+                if graph_args_key in finished:
+                    finished[graph_args_key][k] = inaccuracy
+                else:
+                    finished[graph_args_key] = {k: inaccuracy}
+                if set(finished[graph_args_key].keys()) == set(range(kfolds)) and not graph_args_key in reported:
+                    avg_inac = sum(finished[graph_args_key].values())/kfolds
+                    print("Telling optimizer input: %s \n resulting in output: %s" % (graph_args, 100. - max(val_acc_vals)))
+                    optimizer.tell(graph_args, 100. - max(val_acc_vals))
+                    reported[graph_args_key] = True
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished, reported)
         elif tag == EXIT:
             print("Worker %d exited at %s" % (source,time.asctime(time.localtime())))
             closed_workers += 1
@@ -128,13 +155,13 @@ else:
         args, k = task
         tag = status.Get_tag()
         if tag == START:
-            print ("Received parameters ",task,"to operate on")
+           # print ("Received parameters ",task,"to operate on")
             # Do the work here
-            com = "python graph_train.py -e %s -a %s -p %s -k %s" % (n_epochs, 
+            com = "python graph_train.py -e %s -a %s -p %s -k %s -t" % (n_epochs, 
                                                                      ' '.join([str(i) for i in args]), 
                                                                      path,
                                                                      k)
-            print ("Will execute the command: ", com)
+           # print ("Will execute the command: ", com)
             code = os.system(com)
             ## is there a way to catch that single.py exited without running a single epoch ? yes exit code 123
             comm.send(task, dest=0, tag=DONE)

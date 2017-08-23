@@ -146,13 +146,18 @@ def early_stopping(acc, patience = 3):
         return True
     return False
 
-def write_test_value(path, args):
-    out = open(path, 'w')
-    out.write('line 1\n')
-    out.write('line 2\n')
-    out.write(str([sum(args)]) + '\n')
-    out.write('line 3\n')
-    out.close()
+def write_test_value(path, args, k):
+    json_out = open(path, 'w')
+    out_dict = {'file_name_dict':{}, 
+                'args': args, 
+                'val_acc_vals': [sum(args)],
+                'done': False,
+                'kfold': k,
+                'train_time': 1,
+                'gpu': 1
+               }
+    json_out.write(json.dumps(out_dict))
+    json_out.close()
 
 def train_epoch(trainingv, targetv, valv, val_targetv, gpu = False):
     for j in range(0, trainingv.size()[0], batch_size):
@@ -200,10 +205,8 @@ file_name_dict = {i: arg_dir + i + '.torch' for i in ['gnn',
 best_name_dict = {i: arg_dir + 'best_' + i + '.torch' for i in file_name_dict.keys()}
 file_name_dict['training_path'] = path + 'training/'
 if test == 1:
-    if not os.path.isdir(arg_dir):
-        os.makedirs(arg_dir)
-    write_test_value(best_checkpoint, graph_args)
-else:    
+    write_test_value(best_checkpoint, graph_args, kfold)
+else: 
     batch_size = 500
     if os.path.exists(checkpoint):
         print("Resuming from checkpoint located at %s" % checkpoint)
@@ -237,8 +240,6 @@ else:
                                  gpu)
     else:
         print("No checkpoint at: %s\n Creating it." %checkpoint)
-        if not os.path.isdir(arg_dir):
-            os.makedirs(arg_dir)
         val_acc_vals = np.array([])
         De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = graph_args
         trainingv, targetv, valv, val_targetv = get_training(file_name_dict['training_path'], 
