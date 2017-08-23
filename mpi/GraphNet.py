@@ -63,8 +63,8 @@ class GraphNet(nn.Module):
         self.Rr = Variable(self.Rr)
         self.Rs = Variable(self.Rs)
         if self.use_gpu:
-            self.Rr = Variable(self.Rr).cuda()
-            self.Rs = Variable(self.Rs).cuda()
+            self.Rr = self.Rr.cuda()
+            self.Rs = self.Rs.cuda()
         
     def forward(self, x):
         Orr = self.tmul(x, self.Rr)

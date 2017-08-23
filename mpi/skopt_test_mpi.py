@@ -43,9 +43,10 @@ parser.add_argument('--epoch',
                     type=int,
                     nargs = 1)
 
-def save_state(path, optimizer, unfinished):
+def save_state(path, optimizer, unfinished, finished):
     dic = {'optimizer': optimizer,
-           'unfinished': unfinished}
+           'unfinished': unfinished,
+           'finished': finished}
     pickle.dump(dic, open(path + '_tmp', 'wb'))
     os.rename(path + '_tmp', path)
 
@@ -58,16 +59,16 @@ def open_checkpoint(checkpoint):
 def load_state(path):
     if os.path.exists(path):
         dic = pickle.load(open(path, 'rb'))
-        optimizer, unfinished = dic['optimizer'], dic['unfinished']
+        optimizer, unfinished, finished = dic['optimizer'], dic['unfinished'], dic['finished']
     else:
         optimizer = Optimizer(
                         base_estimator=GaussianProcessRegressor(),
                         dimensions=[Integer(5, 20) for i in range(8)], acq_optimizer='sampling')
         unfinished = []
-    return optimizer, unfinished
+        finished = {}
+    return optimizer, unfinished, finished
 
 def get_path(data, checkpoint_path):
-    print(checkpoint_path)
     return checkpoint_path + "-".join([str(i) for i in data]) + '/'
 
 diff = lambda l1,l2: filter(lambda x: x not in l2, l1)
@@ -80,7 +81,7 @@ kfolds = 10
 if not os.path.isdir(checkpoint_path):
     os.makedirs(checkpoint_path)
 if rank == 0:
-    optimizer, unfinished = load_state(checkpoint_path + 'optimizer.pkl')
+    optimizer, unfinished, finished = load_state(checkpoint_path + 'optimizer.pkl')
     working = []
     num_workers = size - 1 # remove the master
     closed_workers = 0
@@ -101,11 +102,11 @@ if rank == 0:
             else: 
                 task = l[0]
             working.append(task)
-            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished)
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished)
             comm.send(task, dest=source, tag=START)
-            print("Sending task %s to worker %d at %s"% (task, source, time.asctime(time.localtime())))
+            print("Sending task %s to worker %d at %s" % (task, source, time.asctime(time.localtime())))
         elif tag == DONE:
-            print("Got data %s from worker %d at %s" %(data, source, time.asctime(time.localtime())))
+            print("Got data %s from worker %d at %s" % (data, source, time.asctime(time.localtime())))
             graph_args, k = data
             unfinished.remove(data)
             working.remove(data)
@@ -113,7 +114,7 @@ if rank == 0:
             val_acc_vals = open_checkpoint(checkpoint)
             print("Telling optimizer input: %s \n resulting in output: %s" % (data, 100. - max(val_acc_vals)))
             optimizer.tell(graph_args, 100. - max(val_acc_vals))
-            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished)
+            save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished)
         elif tag == EXIT:
             print("Worker %d exited at %s" % (source,time.asctime(time.localtime())))
             closed_workers += 1

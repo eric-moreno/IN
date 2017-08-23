@@ -9,7 +9,7 @@ import ast
 import numpy as np
 import mpi_util
 import os, json, time
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 parser = argparse.ArgumentParser(description='Get GNN parameters or saved state.')
 no_file = "NOFILE"
 
@@ -52,8 +52,17 @@ parser.add_argument('--kfold',
                     '-k',
                     dest = 'kfold',
                     type = int)
-   
-def write_checkpoint(out, file_name_dict, gnn, optimizer, args, val_acc_vals, done, kfold, train_time):
+
+parser.add_argument('--gpu',  #Use CPU unless I receive this flag
+                    '-g',
+                    dest = 'gpu',
+                    action = 'store_true'
+                    ) 
+parser.set_defaults(gpu = False)
+
+def write_checkpoint(out, file_name_dict, gnn, optimizer, 
+                     args, val_acc_vals, done, kfold, 
+                     train_time, gpu):
     args = [gnn.N,
             gnn.n_targets,
             gnn.P,
@@ -70,7 +79,8 @@ def write_checkpoint(out, file_name_dict, gnn, optimizer, args, val_acc_vals, do
                 'val_acc_vals': val_acc_vals.tolist(),
                 'done': done,
                 'kfold': kfold,
-                'train_time': train_time
+                'train_time': train_time,
+                'gpu': gpu
                }
     json_out = open(out + '_tmp', 'w')
     json_out.write(json.dumps(out_dict))
@@ -91,20 +101,20 @@ def get_training(path, kfold):
     val_target = torch.load(path + 'val_target.torch')
     return training, target, val, val_target
 
-def read_checkpoint(checkpoint, kfold):
+def read_checkpoint(checkpoint, kfold, gpu):
     in_json  = open(checkpoint, 'r')
     in_dict = json.load(in_json)
-    print(in_dict)
     file_name_dict = in_dict['file_name_dict']
     val_acc_vals = np.array(in_dict['val_acc_vals'])
     args = in_dict['args']
     done = in_dict['done']
     N, n_targets, P, De, Do, hr1, ho1, hc1, hr2, ho2, hc2 = args
     training, target, val, val_target = get_training(file_name_dict['training_path'], kfold)
-    gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2)
+    gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2, use_gpu = gpu)
     gnn.load_state_dict(torch.load(file_name_dict['gnn']))
     optimizer = optim.Adam(gnn.parameters())
-    optimizer.load_state_dict(torch.load(file_name_dict['optimizer']))
+    if gpu == in_dict['gpu']:
+        optimizer.load_state_dict(torch.load(file_name_dict['optimizer']))
     return gnn, optimizer, training, target, val, val_target, file_name_dict, val_acc_vals, done
 
 def accuracy(predict, target):
@@ -144,11 +154,16 @@ def write_test_value(path, args):
     out.write('line 3\n')
     out.close()
 
-def train_epoch(trainingv, targetv, valv, val_targetv):
+def train_epoch(trainingv, targetv, valv, val_targetv, gpu = False):
     for j in range(0, trainingv.size()[0], batch_size):
         optimizer.zero_grad()
-        out = gnn(trainingv[j:j + batch_size].cuda())
-        l = loss(out, targetv[j:j + batch_size].cuda())
+        batch = trainingv[j:j + batch_size]
+        batch_target = targetv[j:j + batch_size]
+        if gpu:
+            batch = batch.cuda()
+            batch_target = batch_target.cuda()
+        out = gnn(batch)
+        l = loss(out, batch_target)
         l.backward()
         optimizer.step()
         loss_string = "Loss: %s" % "{0:.5f}".format(l.cpu().data.numpy()[0])
@@ -159,7 +174,11 @@ def train_epoch(trainingv, targetv, valv, val_targetv):
                                                         length = 20)
     lst = []
     for j in torch.split(valv, 100):
-        a = gnn(j.cuda()).cpu().data.numpy()
+        if gpu:
+            j = j.cuda()
+            a = gnn(j.cuda()).cpu().data.numpy()
+        else:
+            a = gnn(j).data.numpy()
         lst.append(a)
     predicted = Variable(torch.FloatTensor(np.concatenate(lst)))
     a = stats(predicted, val_targetv)
@@ -170,7 +189,7 @@ args = parser.parse_args()
 test = args.test[0]
 graph_args = args.args
 kfold = args.kfold
-print(kfold)
+gpu = args.gpu
 path = args.path[0]
 n_epochs = args.epoch[0]
 arg_dir = get_path(graph_args, path)
@@ -189,7 +208,7 @@ else:
     if os.path.exists(checkpoint):
         print("Resuming from checkpoint located at %s" % checkpoint)
         gnn, optimizer, trainingv, targetv, valv, val_targetv, \
-        file_name_dict, val_acc_vals, done = read_checkpoint(checkpoint, kfold)
+        file_name_dict, val_acc_vals, done = read_checkpoint(checkpoint, kfold, gpu)
         if done:
             print ("Already finished, not sure why you asked me to do this again.")
         else:
@@ -200,18 +219,22 @@ else:
                 val_acc_vals = np.append(val_acc_vals, train_epoch(trainingv,
                                                                    targetv,
                                                                    valv, 
-                                                                   val_targetv))
+                                                                   val_targetv,
+                                                                   gpu = gpu))
                 end_time = time.time()
                 train_time = end_time - start_time
+                print("Time for epoch: %s" % train_time)
                 if (val_acc_vals[-1] == min(val_acc_vals)):
                     write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
-                                     args, val_acc_vals, done, kfold, train_time)
+                                     args, val_acc_vals, done, kfold, train_time,
+                                     gpu)
                 if early_stopping(val_acc_vals):
                     done = True
                     break
                 print
                 write_checkpoint(checkpoint, file_name_dict, gnn, optimizer, 
-                                 args, val_acc_vals, done, kfold, train_time)
+                                 args, val_acc_vals, done, kfold, train_time,
+                                 gpu)
     else:
         print("No checkpoint at: %s\n Creating it." %checkpoint)
         if not os.path.isdir(arg_dir):
@@ -223,7 +246,7 @@ else:
         N = int(trainingv.size()[2])
         P = int(trainingv.size()[1])
         n_targets = int(max(targetv.data.numpy())) + 1
-        gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2)
+        gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2, use_gpu = gpu)
         optimizer = optim.Adam(gnn.parameters())
         loss = nn.CrossEntropyLoss()
         for i in range(n_epochs):
@@ -232,15 +255,19 @@ else:
             val_acc_vals = np.append(val_acc_vals, train_epoch(trainingv,
                                                                targetv,
                                                                valv, 
-                                                               val_targetv))
+                                                               val_targetv,
+                                                               gpu))
             end_time = time.time()
             train_time = end_time - start_time
+            print("Time for epoch: %s" % train_time)
             if (val_acc_vals[-1] == min(val_acc_vals)):
                 write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
-                                 args, val_acc_vals, done, kfold, train_time)
+                                 args, val_acc_vals, done, kfold, train_time,
+                                 gpu)
             if early_stopping(val_acc_vals):
                 done = True
                 break
             print
             write_checkpoint(checkpoint, file_name_dict, gnn, optimizer, 
-                             args, val_acc_vals, done, kfold, train_time)
+                             args, val_acc_vals, done, kfold, train_time,
+                             gpu)
