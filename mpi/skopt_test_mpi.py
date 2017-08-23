@@ -93,7 +93,7 @@ def load_state(path):
 def get_path(data, checkpoint_path):
     return checkpoint_path + "-".join([str(i) for i in data]) + '/'
 
-diff = lambda l1,l2: filter(lambda x: x not in l2, l1)
+diff = lambda l1,l2: list(filter(lambda x: x not in l2, l1))
 
 args = parser.parse_args()
 n_epochs = args.epoch[0]
