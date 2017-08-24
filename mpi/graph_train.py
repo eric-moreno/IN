@@ -233,7 +233,7 @@ else:
                 end_time = time.time()
                 train_time = end_time - start_time
                 print("Time for epoch: %s" % train_time)
-                if (val_acc_vals[-1] == min(val_acc_vals)):
+                if (val_acc_vals[-1] == max(val_acc_vals)):
                     write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
                                      args, val_acc_vals, done, kfold, train_time,
                                      gpu)
@@ -267,7 +267,7 @@ else:
             end_time = time.time()
             train_time = end_time - start_time
             print("Time for epoch: %s" % train_time)
-            if (val_acc_vals[-1] == min(val_acc_vals)):
+            if (val_acc_vals[-1] == max(val_acc_vals)):
                 write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
                                  args, val_acc_vals, done, kfold, train_time,
                                  gpu)
