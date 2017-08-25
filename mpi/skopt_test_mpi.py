@@ -151,8 +151,8 @@ if rank == 0:
                     finished[graph_args_key] = {k: inaccuracy}
                 if set(finished[graph_args_key].keys()) == set(range(kfolds)) and not graph_args_key in reported:
                     avg_inac = sum(finished[graph_args_key].values())/kfolds
-                    print("Telling optimizer input: %s \n resulting in output: %s" % (graph_args, 100. - max(val_acc_vals)))
-                    optimizer.tell(graph_args, 100. - max(val_acc_vals))
+                    print("Telling optimizer input: %s \n resulting in output: %s" % (graph_args, avg_inac))
+                    optimizer.tell(graph_args, avg_inac) 
                     reported[graph_args_key] = True
             save_state(checkpoint_path + 'optimizer.pkl', optimizer, unfinished, finished, reported)
         elif tag == EXIT:

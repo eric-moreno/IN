@@ -9,7 +9,7 @@ import ast
 import numpy as np
 import mpi_util
 import os, json, time
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 parser = argparse.ArgumentParser(description='Get GNN parameters or saved state.')
 no_file = "NOFILE"
 
@@ -213,7 +213,7 @@ file_name_dict['training_path'] = path + 'training/'
 if test:
     write_test_value(best_checkpoint, graph_args, kfold)
 else: 
-    batch_size = 500
+    batch_size = 720
     if os.path.exists(checkpoint):
         print("Resuming from checkpoint located at %s" % checkpoint)
         gnn, optimizer, trainingv, targetv, valv, val_targetv, \
@@ -267,6 +267,8 @@ else:
             end_time = time.time()
             train_time = end_time - start_time
             print("Time for epoch: %s" % train_time)
+            if val_acc_vals[-1] < 51:
+                gnn = GraphNet.GraphNet(N, n_targets, list(range(P)), De, Do, hr1, ho1, hc1, hr2, ho2, hc2, use_gpu = gpu)
             if (val_acc_vals[-1] == max(val_acc_vals)):
                 write_checkpoint(best_checkpoint, best_name_dict, gnn, optimizer, 
                                  args, val_acc_vals, done, kfold, train_time,
