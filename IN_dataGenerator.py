@@ -1,9 +1,4 @@
-
-# coding: utf-8
-
-# In[ ]:
-
-
+from __future__ import print_function
 import torch
 import torch.nn as nn
 from torch.autograd.variable import *
@@ -12,24 +7,41 @@ import os
 import numpy as np
 import pandas as pd
 import util
-from __future__ import print_function
 import setGPU
-#os.environ['CUDA_VISIBLE_DEVICES']="6,7"
+import glob
+import sys
+sys.path.insert(0, '/nfshome/jduarte/DL4Jets/mpi_learn/mpi_learn/train')
+os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 
+save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+test_2_arrays = []
+test_3_arrays = []
+target_test_arrays = []
 
-# In[ ]:
+for test_file in sorted(glob.glob(save_path + 'test_*_features_2.npy')):
+    print(test_file)
+    test_2_arrays.append(np.load(test_file))
+test_2 = np.concatenate(test_2_arrays)
 
+for test_file in sorted(glob.glob(save_path + 'test_*_features_3.npy')):
+    print(test_file)
+    test_3_arrays.append(np.load(test_file))
+test_3 = np.concatenate(test_3_arrays)
 
-save_path = '/nfshome/emoreno/IN/'
-#test_0 = np.load(save_path + 'test_features_0.npy')
-#test_0 = np.swapaxes(test_0, 1, 2)
-#test_1 = np.load(save_path + 'test_features_1.npy')
-#test_1 = np.swapaxes(test_1, 1, 2)
-test_2 = np.load(save_path + 'test_features_2.npy')
+for test_file in sorted(glob.glob(save_path + 'test_*_truth_0.npy')):
+    print(test_file)
+    target_test_arrays.append(np.load(test_file))
+target_test = np.concatenate(target_test_arrays)
+
+del test_2_arrays
+del test_3_arrays
+del target_test_arrays
 test_2 = np.swapaxes(test_2, 1, 2)
-test_3 = np.load(save_path + 'test_features_3.npy')
 test_3 = np.swapaxes(test_3, 1, 2)
-target_test = np.load(save_path + 'test_truth_0.npy')
+print(test_2.shape)
+print(test_3.shape)
+print(target_test.shape)
+
 params_0 = ['fj_jetNTracks',
           'fj_nSV',
           'fj_tau0_trackEtaRel_0',
@@ -119,28 +131,17 @@ params_3 = ['sv_ptrel',
           'sv_costhetasvpv'
          ]
 
-
-# In[ ]:
-
-
 from data import H5Data
-
-files = []
-for i in range(37):
-    files.append("/nfshome/emoreno/IN/data/train/data_" + str(i))
+files = glob.glob("/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/data_*.h5")
 
 data = H5Data(batch_size = 100000,
-               cache = None,
-               preloading=0,
-               features_name='training_subgroup', labels_name='target_subgroup')
+              cache = None,
+              preloading=0,
+              features_name='training_subgroup', 
+              labels_name='target_subgroup')
 data.set_file_names(files)
 
-
-# In[ ]:
-
-
 #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
-
 #training = training_2
 test = test_2
 params = params_2
@@ -148,10 +149,6 @@ params = params_2
 test_sv = test_3
 params_sv = params_3
 N = test.shape[2]
-
-
-# In[ ]:
-
 
 def accuracy(predict, target):
     _, p_vals = torch.max(predict, 1)
@@ -172,14 +169,14 @@ def stats(predict, target):
     print("Overall: %s/%s = %s%%" % (sum(p_vals == t), len(t), sum(p_vals == t) * 100.0/len(t)))
     return sum(p_vals == t) * 100.0/len(t)
 
-NBINS=40 # number of bins for loss function
+NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
 LAMBDA = 0.30 # lambda for penalty
 
 def loss_kldiv(y_in,x):
     """
-    mass sculpting penlaty term usking kullback_leibler_divergence
+    mass sculpting penlaty term using kullback_leibler_divergence
     y_in: truth [h, y]
     x: predicted NN output for y
     h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
@@ -187,29 +184,30 @@ def loss_kldiv(y_in,x):
     """
     h = y_in[:,0:NBINS]
     y = y_in[:,NBINS:NBINS+2]
-    h_all = K.dot(K.transpose(h), y)
-    h_all_q = h_all[:,0]
-    h_all_h = h_all[:,1]
-    h_all_q = h_all_q / K.sum(h_all_q,axis=0)
-    h_all_h = h_all_h / K.sum(h_all_h,axis=0)
-    h_btag_anti_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
-    h_btag_anti_h = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
-    h_btag_q = h_btag_anti_q[:,1]
+    
+    # build mass histogram for true q events weighted by q, b prob
+    h_alltag_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
+    # build mass histogram for true b events weighted by q, b prob
+    h_alltag_b = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
+    
+    # select mass histogram for true q events weighted by q prob; normalize
+    h_qtag_q = h_alltag_q[:,0]
+    h_qtag_q = h_qtag_q / K.sum(h_qtag_q,axis=0)
+    # select mass histogram for true q events weighted by b prob; normalize
+    h_btag_q = h_alltag_q[:,1]
     h_btag_q = h_btag_q / K.sum(h_btag_q,axis=0)
-    h_anti_q = h_btag_anti_q[:,0]
-    h_anti_q = h_anti_q / K.sum(h_anti_q,axis=0)
-    h_btag_h = h_btag_anti_h[:,1]
-    h_btag_h = h_btag_h / K.sum(h_btag_h,axis=0)
-    h_anti_h = h_btag_anti_q[:,0]
-    h_anti_h = h_anti_h / K.sum(h_anti_h,axis=0)
+    # select mass histogram for true b events weighted by q prob; normalize        
+    h_qtag_b = h_alltag_b[:,0]
+    h_qtag_b = h_qtag_b / K.sum(h_qtag_b,axis=0)
+    # select mass histogram for true b events weighted by b prob; normalize        
+    h_btag_b = h_alltag_b[:,1]
+    h_btag_b = h_btag_b / K.sum(h_btag_b,axis=0)
 
-    return categorical_crossentropy(y, x) +         LAMBDA*kullback_leibler_divergence(h_btag_q, h_anti_q) +         LAMBDA*kullback_leibler_divergence(h_btag_h, h_anti_h)         
+    # compute KL divergence between true q events weighted by b vs q prob (symmetrize?)
+    # compute KL divergence between true b events weighted by b vs q prob (symmetrize?)
+    return categorical_crossentropy(y, x) +         LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) +         LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
 
 
-# In[ ]:
-
-
-get_ipython().run_line_magic('matplotlib', 'inline')
 import matplotlib.pyplot as plt
 from sklearn import preprocessing
 import seaborn as sns
@@ -303,24 +301,21 @@ def generate_control_plots():
         plt.close("all")
     plt.show()
 
-
-# In[ ]:
-
-
 import itertools
 from sklearn import utils
 use_cuda = True
-device = torch.device("cuda" if use_cuda else "cpu")
+device = torch.device("cuda" if use_cuda else torch.device("cpu"))
 
 class GraphNet(nn.Module):
     def __init__(self, n_constituents, n_targets, params, hidden):
         super(GraphNet, self).__init__()
-        self.hidden = hidden
+        self.hidden = int(hidden)
         self.P = len(params)
         self.N = n_constituents
         self.S = test_sv.shape[1]
         self.Nv = test_sv.shape[2]
         self.Nr = self.N * (self.N - 1)
+        self.Nt = self.N * self.Nv
         self.Dr = 0
         self.De = 5
         self.Dx = 0
@@ -331,16 +326,18 @@ class GraphNet(nn.Module):
         #self.switch = switch
         
         self.Ra = torch.ones(self.Dr, self.Nr)
-        self.fr1 = nn.Linear(2 * self.P + self.Dr, hidden).cuda()
-        self.fr1_sv = nn.Linear(self.S + self.P + self.Dr, hidden).cuda()
-        self.fr2 = nn.Linear(hidden, hidden/2).cuda()
-        self.fr3 = nn.Linear(hidden/2, self.De).cuda()
-        self.fo1 = nn.Linear(self.P + self.Dx + (2 * self.De), hidden).cuda()
-        self.fo2 = nn.Linear(hidden, hidden/2).cuda()
-        self.fo3 = nn.Linear(hidden/2, self.Do).cuda()
-        self.fc1 = nn.Linear(self.Do * self.N, hidden).cuda()
-        self.fc2 = nn.Linear(hidden, hidden/2).cuda()
-        self.fc3 = nn.Linear(hidden/2, self.n_targets).cuda()
+        self.fr1 = nn.Linear(2 * self.P + self.Dr, self.hidden).cuda()
+        self.fr1_sv = nn.Linear(self.S + self.P + self.Dr, self.hidden).cuda()
+        self.fr2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+        self.fr2_sv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+        self.fr3 = nn.Linear(int(self.hidden/2), self.De).cuda()
+        self.fr3_sv = nn.Linear(int(self.hidden/2), self.De).cuda()
+        self.fo1 = nn.Linear(self.P + self.Dx + (2 * self.De), self.hidden).cuda()
+        self.fo2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+        self.fo3 = nn.Linear(int(self.hidden/2), self.Do).cuda()
+        self.fc1 = nn.Linear(self.Do * self.N, self.hidden).cuda()
+        self.fc2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+        self.fc3 = nn.Linear(int(self.hidden/2), self.n_targets).cuda()
         self.fc_fixed = nn.Linear(self.Do, self.n_targets).cuda()
         #self.gru = nn.GRU(input_size = self.Do, hidden_size = 20, bidirectional = False).cuda()
             
@@ -355,9 +352,9 @@ class GraphNet(nn.Module):
         self.Rs = (self.Rs).cuda()
     
     def assign_matrices_SV(self):
-        self.Rk = torch.zeros(self.N, self.Nr)
-        self.Rv = torch.zeros(self.Nv, self.Nr)
-        receiver_sender_list = [i for i in itertools.product(range(self.N), range(self.Nv)) if i[0]!=i[1]]
+        self.Rk = torch.zeros(self.N, self.Nt)
+        self.Rv = torch.zeros(self.Nv, self.Nt)
+        receiver_sender_list = [i for i in itertools.product(range(self.N), range(self.Nv))]
         for i, (k, v) in enumerate(receiver_sender_list):
             self.Rk[k, i] = 1
             self.Rv[v, i] = 1
@@ -366,6 +363,7 @@ class GraphNet(nn.Module):
         
     def forward(self, x, y):
         ###PF Candidate - PF Candidate###
+        print(x.shape, self.Rr.shape)
         Orr = self.tmul(x, self.Rr)
         Ors = self.tmul(x, self.Rs)
         B = torch.cat([Orr, Ors], 1)
@@ -377,6 +375,9 @@ class GraphNet(nn.Module):
         del B
         E = torch.transpose(E, 1, 2).contiguous()
         Ebar = self.tmul(E, torch.transpose(self.Rr, 0, 1).contiguous())
+        print('E',E.shape)
+        print('Rr',self.Rr.shape)
+        print('Ebar',Ebar.shape)
         del E
         
         ####Secondary Vertex - PF Candidate### 
@@ -386,17 +387,20 @@ class GraphNet(nn.Module):
         ### First MLP ###
         B = torch.transpose(B, 1, 2).contiguous()
         B = nn.functional.relu(self.fr1_sv(B.view(-1, self.S + self.P + self.Dr)))
-        B = nn.functional.relu(self.fr2(B))
-        E = nn.functional.relu(self.fr3(B).view(-1, self.Nr, self.De))
+        B = nn.functional.relu(self.fr2_sv(B))
+        E = nn.functional.relu(self.fr3_sv(B).view(-1, self.Nt, self.De))
         del B
         E = torch.transpose(E, 1, 2).contiguous()
-        Ebar_sv = self.tmul(E, torch.transpose(self.Rr, 0, 1).contiguous())
+        print('E',E.shape)
+        print('Rk',self.Rk.shape)
+        Ebar_sv = self.tmul(E, torch.transpose(self.Rk, 0, 1).contiguous())
+        print('Ebar_sv',Ebar_sv.shape)
         del E
 
         ####Final output matrix###
-        C = torch.cat([x, Ebar], 1)
+        C = torch.cat([x, Ebar, Ebar_sv], 1)
         del Ebar
-        C = torch.cat([C, Ebar_sv], 1)
+        #C = torch.cat([C, Ebar_sv], 1)
         del Ebar_sv
         C = torch.transpose(C, 1, 2).contiguous()
         ### Second MLP ###
@@ -444,10 +448,6 @@ def get_sample_train(training1, training2, target, choice):
     #chosen_ind = np.random.choice(ind, 200000)
     return training1[chosen_ind], training2[chosen_ind], target[chosen_ind]
 
-
-# In[ ]:
-
-
 #Test Set
 val_split = 0.1
 batch_size =128
@@ -489,9 +489,12 @@ for m in range(n_epochs):
     correct = []
     
     for sub_X,sub_Y in data.generate_data():
-        
-        training = sub_X[1]
-        training_sv = sub_X[2]
+
+        #print(sub_X, sub_Y)
+        #print(sub_X[0].shape,sub_X[1].shape,sub_X[2].shape,sub_X[3].shape,sub_X[4].shape)
+        #print(sub_Y[0].shape)
+        training = sub_X[3]
+        training_sv = sub_X[4]
         target = sub_Y[0]
 
         # Training Set
@@ -664,7 +667,6 @@ plt.show()
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
 plt.figure(figsize=(12, 10), dpi = 200)
 plt.plot(acc_vals[:final_epoch])
 sns.set()
@@ -727,10 +729,6 @@ plt.legend(loc="lower right")
 plt.savefig('ROC_curve_data_generator')
 plt.show()
 
-
-# In[ ]:
-
-
 test_full = torch.FloatTensor(np.concatenate(np.array([test])))
 test_sv_full = torch.FloatTensor(np.concatenate(np.array([test_sv])))
 prediction_test = np.array([])
@@ -753,10 +751,6 @@ for i in range(prediction_test.size):
     
 #np.save('out', out)
 #np.save('prediction', prediction_test)
-
-
-# In[ ]:
-
 
 train_full = torch.FloatTensor(np.concatenate(np.array([train])))
 train_sv_full = torch.FloatTensor(np.concatenate(np.array([train_sv])))
