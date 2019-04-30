@@ -10,8 +10,10 @@ import util
 import setGPU
 import glob
 import sys
+import tqdm
 sys.path.insert(0, '/nfshome/jduarte/DL4Jets/mpi_learn/mpi_learn/train')
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
+
 
 save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 test_2_arrays = []
@@ -19,17 +21,14 @@ test_3_arrays = []
 target_test_arrays = []
 
 for test_file in sorted(glob.glob(save_path + 'test_*_features_2.npy')):
-    print(test_file)
     test_2_arrays.append(np.load(test_file))
 test_2 = np.concatenate(test_2_arrays)
 
 for test_file in sorted(glob.glob(save_path + 'test_*_features_3.npy')):
-    print(test_file)
     test_3_arrays.append(np.load(test_file))
 test_3 = np.concatenate(test_3_arrays)
 
 for test_file in sorted(glob.glob(save_path + 'test_*_truth_0.npy')):
-    print(test_file)
     target_test_arrays.append(np.load(test_file))
 target_test = np.concatenate(target_test_arrays)
 
@@ -38,6 +37,7 @@ del test_3_arrays
 del target_test_arrays
 test_2 = np.swapaxes(test_2, 1, 2)
 test_3 = np.swapaxes(test_3, 1, 2)
+
 print(test_2.shape)
 print(test_3.shape)
 print(target_test.shape)
@@ -131,15 +131,6 @@ params_3 = ['sv_ptrel',
           'sv_costhetasvpv'
          ]
 
-from data import H5Data
-files = glob.glob("/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/data_*.h5")
-
-data = H5Data(batch_size = 100000,
-              cache = None,
-              preloading=0,
-              features_name='training_subgroup', 
-              labels_name='target_subgroup')
-data.set_file_names(files)
 
 #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
 #training = training_2
@@ -149,6 +140,30 @@ params = params_2
 test_sv = test_3
 params_sv = params_3
 N = test.shape[2]
+
+from data import H5Data
+files = glob.glob("/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/data_*.h5")
+files_val = files[:5] # take first 5 for validation
+files_train = files[5:] # take rest for training
+
+batch_size = 128
+data_train = H5Data(batch_size = batch_size,
+                    cache = None,
+                    preloading=0,
+                    features_name='training_subgroup', 
+                    labels_name='target_subgroup')
+data_train.set_file_names(files_train)
+data_val = H5Data(batch_size = batch_size,
+                    cache = None,
+                    preloading=0,
+                    features_name='training_subgroup', 
+                    labels_name='target_subgroup')
+data_val.set_file_names(files_train)
+n_val =data_val.count_data()
+n_train=data_train.count_data()
+print(n_val)
+print(n_train)
+
 
 def accuracy(predict, target):
     _, p_vals = torch.max(predict, 1)
@@ -165,8 +180,8 @@ def stats(predict, target):
         ind = np.where(t == i)
         pv = p_vals[ind]
         correct = sum(pv == t[ind])
-        print("  Target %s: %s/%s = %s%%" % (i, correct, len(pv), correct * 100.0/len(pv)))
-    print("Overall: %s/%s = %s%%" % (sum(p_vals == t), len(t), sum(p_vals == t) * 100.0/len(t)))
+        #print("  Target %s: %s/%s = %s%%" % (i, correct, len(pv), correct * 100.0/len(pv)))
+    #print("Overall: %s/%s = %s%%" % (sum(p_vals == t), len(t), sum(p_vals == t) * 100.0/len(t)))
     return sum(p_vals == t) * 100.0/len(t)
 
 NBINS = 40 # number of bins for loss function
@@ -258,48 +273,6 @@ def predicted_histogram(data,
     ax.set_title(title)
     ax.legend()
 
-def generate_control_plots():
-    #global gnn
-    len_params = len(params)
-    path = '/nfshome/emoreno/IN/img/n-h-hb/'
-    #os.makedirs(path)
-    fr = 0
-    b = 1000
-    pred= None
-    while fr< valv.shape[0]: #beginning splitting up valv into batches because memory runs out
-        print ("Predicting from",fr)
-        valv_1 = valv[fr:fr+b,...]
-        p = gnn(valv_1.cuda())
-        valv_1.cpu()
-        p = p.cpu().data
-        fr +=b
-        if pred is None:
-            pred = p
-        else:
-            pred = np.append(pred,p,axis=0)
-        print (pred.shape) #end 
-
-    d_target = np.array([util.get_list_from_num(i, length = n_targets) 
-                             for i in val_targetv.cpu().data.numpy()])
-    p_target = pred#.cpu().data.numpy()
-    for i in range(len(params)):
-        xlabel = params[i]
-        labels = ["None", "H", "H + b"]
-        data = np.mean(valv.data.numpy()[:, i, :], axis = 1)
-        predicted_histogram(data, d_target, 
-                            nbins = 50, labels = labels,
-                            xlabel = xlabel, 
-                            title = "Actual Distribution"
-                           )
-        plt.savefig(path + xlabel + "-actual.png", dpi = 200)
-        predicted_histogram(data, p_target, 
-                            nbins = 50, labels = labels,
-                            xlabel = xlabel,
-                            title = "Predicted Distribution"
-                           )
-        plt.savefig(path + xlabel + "-predicted.png", dpi = 200)
-        plt.close("all")
-    plt.show()
 
 import itertools
 from sklearn import utils
@@ -307,7 +280,7 @@ use_cuda = True
 device = torch.device("cuda" if use_cuda else torch.device("cpu"))
 
 class GraphNet(nn.Module):
-    def __init__(self, n_constituents, n_targets, params, hidden):
+    def __init__(self, n_constituents, n_targets, params, hidden, vv_branch=False):
         super(GraphNet, self).__init__()
         self.hidden = int(hidden)
         self.P = len(params)
@@ -316,6 +289,7 @@ class GraphNet(nn.Module):
         self.Nv = test_sv.shape[2]
         self.Nr = self.N * (self.N - 1)
         self.Nt = self.N * self.Nv
+        self.Ns = self.Nv * (self.Nv - 1)
         self.Dr = 0
         self.De = 5
         self.Dx = 0
@@ -323,22 +297,33 @@ class GraphNet(nn.Module):
         self.n_targets = n_targets
         self.assign_matrices()
         self.assign_matrices_SV()
-        #self.switch = switch
+        self.vv_branch = vv_branch
+        if self.vv_branch:
+            self.assign_matrices_SVSV()
         
         self.Ra = torch.ones(self.Dr, self.Nr)
         self.fr1 = nn.Linear(2 * self.P + self.Dr, self.hidden).cuda()
-        self.fr1_sv = nn.Linear(self.S + self.P + self.Dr, self.hidden).cuda()
         self.fr2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-        self.fr2_sv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
         self.fr3 = nn.Linear(int(self.hidden/2), self.De).cuda()
-        self.fr3_sv = nn.Linear(int(self.hidden/2), self.De).cuda()
+        self.fr1_pv = nn.Linear(self.S + self.P + self.Dr, self.hidden).cuda()
+        self.fr2_pv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+        self.fr3_pv = nn.Linear(int(self.hidden/2), self.De).cuda()
+        if self.vv_branch:
+            self.fr1_vv = nn.Linear(2 * self.S + self.Dr, self.hidden).cuda()
+            self.fr2_vv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+            self.fr3_vv = nn.Linear(int(self.hidden/2), self.De).cuda()
         self.fo1 = nn.Linear(self.P + self.Dx + (2 * self.De), self.hidden).cuda()
         self.fo2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
         self.fo3 = nn.Linear(int(self.hidden/2), self.Do).cuda()
-        self.fc1 = nn.Linear(self.Do * self.N, self.hidden).cuda()
-        self.fc2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-        self.fc3 = nn.Linear(int(self.hidden/2), self.n_targets).cuda()
-        self.fc_fixed = nn.Linear(self.Do, self.n_targets).cuda()
+        if self.vv_branch:
+            self.fo1_v = nn.Linear(self.S + self.Dx + (2 * self.De), self.hidden).cuda()
+            self.fo2_v = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
+            self.fo3_v = nn.Linear(int(self.hidden/2), self.Do).cuda()
+
+        if self.vv_branch:
+            self.fc_fixed = nn.Linear(2*self.Do, self.n_targets).cuda()
+        else:
+            self.fc_fixed = nn.Linear(self.Do, self.n_targets).cuda()
         #self.gru = nn.GRU(input_size = self.Do, hidden_size = 20, bidirectional = False).cuda()
             
     def assign_matrices(self):
@@ -360,10 +345,19 @@ class GraphNet(nn.Module):
             self.Rv[v, i] = 1
         self.Rk = (self.Rk).cuda()
         self.Rv = (self.Rv).cuda()
-        
+
+    def assign_matrices_SVSV(self):
+        self.Rl = torch.zeros(self.Nv, self.Ns)
+        self.Ru = torch.zeros(self.Nv, self.Ns)
+        receiver_sender_list = [i for i in itertools.product(range(self.Nv), range(self.Nv)) if i[0]!=i[1]]
+        for i, (l, u) in enumerate(receiver_sender_list):
+            self.Rl[l, i] = 1
+            self.Ru[u, i] = 1
+        self.Rl = (self.Rl).cuda()
+        self.Ru = (self.Ru).cuda()
+
     def forward(self, x, y):
         ###PF Candidate - PF Candidate###
-        print(x.shape, self.Rr.shape)
         Orr = self.tmul(x, self.Rr)
         Ors = self.tmul(x, self.Rs)
         B = torch.cat([Orr, Ors], 1)
@@ -374,10 +368,7 @@ class GraphNet(nn.Module):
         E = nn.functional.relu(self.fr3(B).view(-1, self.Nr, self.De))
         del B
         E = torch.transpose(E, 1, 2).contiguous()
-        Ebar = self.tmul(E, torch.transpose(self.Rr, 0, 1).contiguous())
-        print('E',E.shape)
-        print('Rr',self.Rr.shape)
-        print('Ebar',Ebar.shape)
+        Ebar_pp = self.tmul(E, torch.transpose(self.Rr, 0, 1).contiguous())
         del E
         
         ####Secondary Vertex - PF Candidate### 
@@ -386,44 +377,66 @@ class GraphNet(nn.Module):
         B = torch.cat([Ork, Orv], 1)
         ### First MLP ###
         B = torch.transpose(B, 1, 2).contiguous()
-        B = nn.functional.relu(self.fr1_sv(B.view(-1, self.S + self.P + self.Dr)))
-        B = nn.functional.relu(self.fr2_sv(B))
-        E = nn.functional.relu(self.fr3_sv(B).view(-1, self.Nt, self.De))
+        B = nn.functional.relu(self.fr1_pv(B.view(-1, self.S + self.P + self.Dr)))
+        B = nn.functional.relu(self.fr2_pv(B))
+        E = nn.functional.relu(self.fr3_pv(B).view(-1, self.Nt, self.De))
         del B
         E = torch.transpose(E, 1, 2).contiguous()
-        print('E',E.shape)
-        print('Rk',self.Rk.shape)
-        Ebar_sv = self.tmul(E, torch.transpose(self.Rk, 0, 1).contiguous())
-        print('Ebar_sv',Ebar_sv.shape)
+        Ebar_pv = self.tmul(E, torch.transpose(self.Rk, 0, 1).contiguous())
+        Ebar_vp = self.tmul(E, torch.transpose(self.Rv, 0, 1).contiguous())
         del E
 
-        ####Final output matrix###
-        C = torch.cat([x, Ebar, Ebar_sv], 1)
-        del Ebar
-        #C = torch.cat([C, Ebar_sv], 1)
-        del Ebar_sv
+        ###Secondary vertex - secondary vertex###
+        if self.vv_branch:
+            Orl = self.tmul(y, self.Rl)
+            Oru = self.tmul(y, self.Ru)
+            B = torch.cat([Orl, Oru], 1)
+            ### First MLP ###
+            B = torch.transpose(B, 1, 2).contiguous()
+            B = nn.functional.relu(self.fr1_vv(B.view(-1, 2 * self.S + self.Dr)))
+            B = nn.functional.relu(self.fr2_vv(B))
+            E = nn.functional.relu(self.fr3_vv(B).view(-1, self.Ns, self.De))
+            del B
+            E = torch.transpose(E, 1, 2).contiguous()
+            Ebar_vv = self.tmul(E, torch.transpose(self.Rl, 0, 1).contiguous())
+            del E
+
+        ####Final output matrix for particles###
+        C = torch.cat([x, Ebar_pp, Ebar_pv], 1)
+        del Ebar_pp
+        del Ebar_pv
         C = torch.transpose(C, 1, 2).contiguous()
         ### Second MLP ###
         C = nn.functional.relu(self.fo1(C.view(-1, self.P + self.Dx + (2 * self.De))))
         C = nn.functional.relu(self.fo2(C))
         O = nn.functional.relu(self.fo3(C).view(-1, self.N, self.Do))
-        #Taking the mean/sum of each column
-        #N = torch.mean(O, dim=1)
-        N = torch.sum(O, dim=1)
         del C
-        ### Classification MLP ###
-        #N = nn.functional.relu(self.fc1(O.view(-1, self.Do * self.N)))
+
+        if self.vv_branch:
+            ####Final output matrix for particles### 
+            C = torch.cat([y, Ebar_vv, Ebar_vp], 1)
+            del Ebar_vv
+            del Ebar_vp
+            C = torch.transpose(C, 1, 2).contiguous()
+            ### Second MLP ###
+            C = nn.functional.relu(self.fo1_v(C.view(-1, self.S + self.Dx + (2 * self.De))))
+            C = nn.functional.relu(self.fo2_v(C))
+            O_v = nn.functional.relu(self.fo3_v(C).view(-1, self.Nv, self.Do))
+            del C
+        
+        #Taking the sum of over each particle/vertex
+        N = torch.sum(O, dim=1)
         del O
-        #N = nn.functional.relu(self.fc2(N))
-        #N = nn.functional.relu(self.fc3(N))
-        N = nn.functional.relu(self.fc_fixed(N))
-        #P = np.array(N.data.cpu().numpy())
-        #N = np.zeros((128, 1, 6))
-        #for i in range(batch_size):
-        #    N[i] = np.array(np.split(P[i], self.Do))
-        #    N[1] = [P[i]]
-        #N, hn = self.gru(torch.tensor(N).cuda())
-        #print((N).shape)
+        if self.vv_branch:
+            N_v = torch.sum(O_v,dim=1)
+            del O_v
+        
+        ### Classification MLP ###
+        if self.vv_branch:
+            N =self.fc_fixed(torch.cat([N, N_v],1))
+        else:
+            N = self.fc_fixed(N)
+
         return N 
             
     def tmul(self, x, y):  #Takes (I * J * K)(K * L) -> I * J * L 
@@ -431,7 +444,7 @@ class GraphNet(nn.Module):
         y_shape = y.size()
         return torch.mm(x.view(-1, x_shape[2]), y).view(-1, x_shape[1], y_shape[1])
 
-n_targets = test.shape[1]
+n_targets = target_test.shape[1]
 gnn = GraphNet(N, n_targets, params, 15)
 #gnn.load_state_dict(torch.load('gnn_SV_tracks_0.4.0.torch_dataGenerator'))
 
@@ -449,28 +462,10 @@ def get_sample_train(training1, training2, target, choice):
     return training1[chosen_ind], training2[chosen_ind], target[chosen_ind]
 
 #Test Set
-val_split = 0.1
 batch_size =128
 n_epochs = 100
-
-n_targets_test = target_test.shape[1]
-samples_test = [get_sample(test, test_sv, target_test, i) for i in range(n_targets_test)]
-tests = [i[0] for i in samples_test]
-tests_sv = [i[1] for i in samples_test]
-targets_tests = [i[2] for i in samples_test]
-big_test = np.concatenate(tests)
-big_test_sv = np.concatenate(tests_sv)
-big_target_test = np.concatenate(targets_tests)
-big_test, big_test_sv, big_target_test = utils.shuffle(big_test, big_test_sv, big_target_test)
-
-testv = (torch.FloatTensor(big_test)).cuda()
-testv_sv = (torch.FloatTensor(big_test_sv)).cuda()
-targetv_test = (torch.from_numpy(np.argmax(big_target_test, axis = 1)).long()).cuda()
-testv, valv_test = torch.split(testv, int(testv.size()[0] * (1 - val_split)))
-testv_sv, valv_test_sv = torch.split(testv_sv, int(testv_sv.size()[0] * (1 - val_split)))
-targetv_test, val_targetv_test = torch.split(targetv_test, int(targetv_test.size()[0] * (1 - val_split)))
     
-loss = nn.CrossEntropyLoss()
+loss = nn.CrossEntropyLoss(reduction='mean')
 optimizer = optim.Adam(gnn.parameters(), lr = 0.0001)
 loss_vals_training = np.zeros(n_epochs)
 loss_validation_std = np.zeros(n_epochs)
@@ -478,9 +473,10 @@ loss_training_std = np.zeros(n_epochs)
 loss_vals_validation = np.zeros(n_epochs)
 acc_vals = np.zeros(n_epochs)
 final_epoch = 0
+l_val_best = 99999
 
 for m in range(n_epochs):
-    print("Epoch %s" % m)
+    print("Epoch %s\n" % m)
     #torch.cuda.empty_cache()
     final_epoch = m
     lst = []
@@ -488,102 +484,41 @@ for m in range(n_epochs):
     loss_training = []
     correct = []
     
-    for sub_X,sub_Y in data.generate_data():
-
-        #print(sub_X, sub_Y)
-        #print(sub_X[0].shape,sub_X[1].shape,sub_X[2].shape,sub_X[3].shape,sub_X[4].shape)
-        #print(sub_Y[0].shape)
+    for sub_X,sub_Y in tqdm.tqdm(data_train.generate_data(),total=n_train/batch_size):
         training = sub_X[3]
         training_sv = sub_X[4]
         target = sub_Y[0]
-
-        # Training Set
-        n_targets = target.shape[1]
-        samples = [get_sample_train(training, training_sv, target, i) for i in range(n_targets)]
-        trainings = [i[0] for i in samples]
-        trainings_sv = [i[1] for i in samples]
-        targets = [i[2] for i in samples]
-        big_training = np.concatenate(trainings)
-        big_training_sv = np.concatenate(trainings_sv)
-        big_target = np.concatenate(targets)
-        big_training, big_training_sv, big_target = utils.shuffle(big_training, big_training_sv, big_target)
-
-        val_split = 0.1
-        batch_size =128
-        n_epochs = 100
-
-        trainingv = (torch.FloatTensor(big_training)).cuda()
-        trainingv_sv = (torch.FloatTensor(big_training_sv)).cuda()
-        targetv = (torch.from_numpy(np.argmax(big_target, axis = 1)).long()).cuda()
-        trainingv, valv = torch.split(trainingv, int(trainingv.size()[0] * (1 - val_split)))
-        trainingv_sv, valv_sv = torch.split(trainingv_sv, int(trainingv_sv.size()[0] * (1 - val_split)))
-        targetv, val_targetv = torch.split(targetv, int(targetv.size()[0] * (1 - val_split)))
-        samples_random = np.random.choice(range(len(trainingv)), valv.size()[0]/100)
-
-        for j in range(0, trainingv.size()[0], batch_size):
-            optimizer.zero_grad()
-            out = gnn(trainingv[j:j + batch_size].cuda(), trainingv_sv[j:j + batch_size].cuda())
-            l = loss(out, targetv[j:j + batch_size].cuda())
-            l.backward()
-            optimizer.step()
-            loss_string = "Loss: %s" % "{0:.5f}".format(l.item())
-            util.printProgressBar(j + batch_size, trainingv.size()[0], 
-                                  prefix = "%s [%s/%s] " % (loss_string, 
-                                                           j + batch_size, 
-                                                           trainingv.size()[0]),
-                                  length = 20)
+        trainingv = (torch.FloatTensor(training)).cuda()
+        trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
+        targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
         
-        del trainingv, training_sv, targetv, valv, valv_sv, val_targetv
+        optimizer.zero_grad()
+        out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+        l = loss(out, targetv.cuda())
+        loss_training.append(l.item())
+        l.backward()
+        optimizer.step()
+        loss_string = "Loss: %s" % "{0:.5f}".format(l.item())
+        del trainingv, trainingv_sv, targetv
         
-    for sub_X,sub_Y in data.generate_data():
-        training = sub_X[1]
-        training_sv = sub_X[2]
+    for sub_X,sub_Y in tqdm.tqdm(data_val.generate_data(),total=n_val/batch_size):
+        training = sub_X[3]
+        training_sv = sub_X[4]
         target = sub_Y[0]
+        trainingv = (torch.FloatTensor(training)).cuda()
+        trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
+        targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
 
-        # Training Set
-        n_targets = target.shape[1]
-        samples = [get_sample_train(training, training_sv, target, i) for i in range(n_targets)]
-        trainings = [i[0] for i in samples]
-        trainings_sv = [i[1] for i in samples]
-        targets = [i[2] for i in samples]
-        big_training = np.concatenate(trainings)
-        big_training_sv = np.concatenate(trainings_sv)
-        big_target = np.concatenate(targets)
-        big_training, big_training_sv, big_target = utils.shuffle(big_training, big_training_sv, big_target)
+        out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+        lst.append(out.cpu().data.numpy())
+        l_val = loss(out, targetv.cuda())
+        loss_val.append(l_val.item())
 
-        val_split = 0.1
-        batch_size =128
-        n_epochs = 100
-
-        trainingv = (torch.FloatTensor(big_training)).cuda()
-        trainingv_sv = (torch.FloatTensor(big_training_sv)).cuda()
-        targetv = (torch.from_numpy(np.argmax(big_target, axis = 1)).long()).cuda()
-        trainingv, valv = torch.split(trainingv, int(trainingv.size()[0] * (1 - val_split)))
-        trainingv_sv, valv_sv = torch.split(trainingv_sv, int(trainingv_sv.size()[0] * (1 - val_split)))
-        targetv, val_targetv = torch.split(targetv, int(targetv.size()[0] * (1 - val_split)))
-        samples_random = np.random.choice(range(len(trainingv)), valv.size()[0]/100)
+        targetv_cpu = targetv.cpu().data.numpy()
+        for n in range(targetv_cpu.shape[0]):
+            correct.append(targetv_cpu[n])
+        del trainingv, trainingv_sv, targetv
         
-        # Validation Loss
-
-        for j in range(0, valv.size()[0], batch_size):
-            out = gnn(valv[j:j + batch_size].cuda(), valv_sv[j:j + batch_size].cuda())
-            lst.append(out.cpu().data.numpy())
-            l_val = loss(out, val_targetv[j:j + batch_size].cuda())
-            loss_val.append(l_val.item())
-
-        val_targetv_cpu = val_targetv.cpu().data.numpy()
-        for n in range(val_targetv_cpu.shape[0]):
-            correct.append(val_targetv_cpu[n])
-
-        # Training Loss
-
-        for j in samples_random:
-            out = gnn(trainingv[j:j + batch_size].cuda(), trainingv_sv[j:j + batch_size].cuda())
-            l_training = loss(out, targetv[j:j + batch_size].cuda())
-            loss_training.append(l_training.item())
-        
-        del trainingv, training_sv, targetv, valv, valv_sv, val_targetv
-
     l_val = np.mean(np.array(loss_val))
     predicted = (torch.FloatTensor(np.concatenate(lst))).to(device)
     print('\nValidation Loss: ', l_val)
@@ -592,7 +527,12 @@ for m in range(n_epochs):
     print('Training Loss: ', l_training)
     val_targetv = torch.FloatTensor(np.array(correct)).cuda()
     
-    torch.save(gnn.state_dict(), 'gnn_SV_tracks_0.4.0.torch_dataGenerator_3')
+    torch.save(gnn.state_dict(), 'gnn_SV_tracks_0.4.0.torch_dataGenerator_3.pt')
+    if l_val < l_val_best:
+        print("new best model")
+        l_val_best = l_val
+        torch.save(gnn.state_dict(), 'gnn_SV_tracks_0.4.0.torch_dataGenerator_3_best.pt')
+        
     acc_vals[m] = stats(predicted, val_targetv)
     loss_vals_training[m] = l_training
     loss_vals_validation[m] = l_val
@@ -602,44 +542,7 @@ for m in range(n_epochs):
         print('Early Stopping...')
         print(loss_vals_training, '\n', np.diff(loss_vals_training))
         break
-    print
-
-
-# In[ ]:
-
-
-del trainingv, training_sv, targetv, valv, valv_sv, val_targetv
-
-
-# In[ ]:
-
-
-del testv, testv_sv, targetv_test
-
-
-# In[ ]:
-
-
-torch.save(gnn.state_dict(), 'gnn_SV_tracks_0.4.0.torch_dataGenerator')
-
-
-# In[ ]:
-
-
-generate_control_plots()
-
-
-# In[ ]:
-
-
-from IPython.display import Image, display
-path = '/nfshome/emoreno/IN/img/n-h-hb/'
-for xlabel in params:
-    display(Image(filename=path + xlabel + '-actual.png'))
-    display(Image(filename=path + xlabel + '-predicted.png'))
-
-
-# In[ ]:
+    print()
 
 
 # Generate Loss Plot
@@ -658,12 +561,9 @@ plt.legend(loc='upper right')
 plt.title('Loss Plot Plain IN (Data Generator)')
 plt.ylabel('Loss')
 plt.xlabel('Epoch')
-plt.savefig('Loss_SV_tracks_data_generator')
+plt.savefig('Loss_SV_tracks_data_generator.png')
+plt.savefig('Loss_SV_tracks_data_generator.pdf')
 plt.show()
-
-
-# In[ ]:
-
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -673,119 +573,57 @@ sns.set()
 plt.title('Accuracy Plain IN (Data Generator)')
 plt.xlabel("Epoch")
 plt.ylabel("Accuracy (%)")
-plt.savefig("Accuracy_SV_tracks_dataGenerator")
-
+plt.savefig("Accuracy_SV_tracks_dataGenerator.png")
+plt.savefig("Accuracy_SV_tracks_dataGenerator.pdf")
 plt.show()
-
-
-# In[ ]:
-
 
 # Generate ROC Plot
 from sklearn.metrics import roc_curve, roc_auc_score
 softmax = torch.nn.Softmax(dim=1)
-gnn.eval()
 prediction = np.array([])
-out = np.array([])
-for j in range(0, testv.size()[0], batch_size):
-    out_test = softmax(gnn(testv[j:j + batch_size].cuda(), testv_sv[j:j + batch_size].cuda()))
-    out_test = out_test.cpu().data.numpy()
-   
-    for i in range(len(out_test)):
-        if (out_test[i][0] > out_test[i][1]): 
-            prediction = np.append(prediction, out_test[i][0])
-            out = np.append(out, 0)
-        else: 
-            prediction = np.append(prediction, out_test[i][1])
-            out = np.append(out, 1)
+batch_size = 128
+torch.cuda.empty_cache()
+for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
+    out_test = softmax(gnn(torch.from_numpy(test[j:j + batch_size]).cuda(), torch.from_numpy(test_sv[j:j + batch_size]).cuda()))
+    if j==0:
+        prediction = out_test.cpu().data.numpy()
+    else:
+        prediction = np.concatenate((prediction, out_test.cpu().data.numpy()),axis=0)
+    del out_test
+    
+np.save('truth.npy', target_test)
+np.save('prediction.npy', prediction)
 
-for i in range(prediction.size): 
-    if out[i] == 0: 
-        prediction[i] = 1.0 - prediction[i]
-        
-fpr, tpr, thresholds = roc_curve(targetv_test.cpu().data.numpy(), prediction)
-auc = roc_auc_score(targetv_test.cpu().data.numpy(), prediction)
+fpr, tpr, thresholds = roc_curve(target_test[:,0], prediction[:,0])
+auc = roc_auc_score(target_test[:,0], prediction[:,0])
 
-fpr_DeepDoubleB = np.load('fpr_DeepDoubleB.npy')
-tpr_DeepDoubleB = np.load('tpr_DeepDoubleB.npy')
-dfpr_BDT = np.load('dfpr_BDT.npy')
-dtpr_BDT = np.load('dtpr_BDT.npy')
+np.save('tpr.npy', tpr)
+np.save('fpr.npy', fpr)
+np.save('thresholds.npy', thresholds)
+
+#fpr_DeepDoubleB = np.load('fpr_DeepDoubleB.npy')
+#tpr_DeepDoubleB = np.load('tpr_DeepDoubleB.npy')
+#dfpr_BDT = np.load('dfpr_BDT.npy')
+#dtpr_BDT = np.load('dtpr_BDT.npy')
 
 plt.figure(figsize=(12,10))
 lw = 2
 plt.semilogy(tpr, fpr, color='darkorange',
          lw=lw, label='Plain IN (area = %0.2f)' % auc)
-plt.plot(tpr_DeepDoubleB, fpr_DeepDoubleB, color='blue',
-         lw=lw, label='Plain DeepDoubleB (area = 0.97)')
-plt.plot(dtpr_BDT, dfpr_BDT, color='green',
-         lw=lw, label='BDT (area = 0.914)' % auc)
-plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+#plt.plot(tpr_DeepDoubleB, fpr_DeepDoubleB, color='blue',
+#         lw=lw, label='Plain DeepDoubleB (area = 0.97)')
+#plt.plot(dtpr_BDT, dfpr_BDT, color='green',
+#         lw=lw, label='BDT (area = 0.914)' % auc)
+#plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
 plt.xlim([0.0, 1.0])
-plt.ylim([10**-3, 1])
+plt.ylim([1e-3, 1])
 plt.ylabel('False Positive Rate')
 plt.xlabel('True Positive Rate')
 plt.title('ROC Plain IN (Data Generator)')
 plt.legend(loc="lower right")
-plt.savefig('ROC_curve_data_generator')
+plt.savefig('ROC_curve_data_generator.png')
+plt.savefig('ROC_curve_data_generator.pdf')
 plt.show()
-
-test_full = torch.FloatTensor(np.concatenate(np.array([test])))
-test_sv_full = torch.FloatTensor(np.concatenate(np.array([test_sv])))
-prediction_test = np.array([])
-gnn_out = np.array([])
-for j in range(0, test_full.size()[0], batch_size):
-    print(j)
-    out_test = softmax(gnn(test_full[j:j + batch_size].cuda(), test_sv_full[j:j + batch_size].cuda()))
-    out_test = out_test.cpu().data.numpy()
-    for i in range(len(out_test)):
-        if (out_test[i][0] > out_test[i][1]): 
-            prediction_test = np.append(prediction_test, out_test[i][0])
-            gnn_out = np.append(gnn_out, 0)
-        else: 
-            prediction_test = np.append(prediction_test, out_test[i][1])
-            gnn_out = np.append(gnn_out, 1)
-
-for i in range(prediction_test.size): 
-    if gnn_out[i] == 0: 
-        prediction_test[i] = 1.0 - prediction_test[i]
-    
-#np.save('out', out)
-#np.save('prediction', prediction_test)
-
-train_full = torch.FloatTensor(np.concatenate(np.array([train])))
-train_sv_full = torch.FloatTensor(np.concatenate(np.array([train_sv])))
-prediction_train = np.array([])
-gnn_out = np.array([])
-for j in range(0, test_full.size()[0], batch_size * 10):
-    print(j)
-    out_test = softmax(gnn(test_full[j:j + batch_size * 10].cuda(), test_sv_full[j:j + batch_size * 10].cuda()))
-    out_test = out_test.cpu().data.numpy()
-    for i in range(len(out_test)):
-        if (out_test[i][0] > out_test[i][1]): 
-            prediction_test = np.append(prediction_test, out_test[i][0])
-            gnn_out = np.append(gnn_out, 0)
-        else: 
-            prediction_test = np.append(prediction_test, out_test[i][1])
-            gnn_out = np.append(gnn_out, 1)
-
-for i in range(prediction_test.size): 
-    if gnn_out[i] == 0: 
-        prediction_test[i] = 1.0 - prediction_test[i]
-    
-
-
-# In[ ]:
-
-
-np.save('out', gnn_out)
-np.save('prediction', prediction_test)
-np.save('tpr', tpr)
-np.save('fpr', fpr)
-np.save('thresholds', thresholds)
-
-
-# In[ ]:
 
 
 torch.cuda.empty_cache()
-
