@@ -72,14 +72,15 @@ print(target_test.shape)
 fj_pt = test_spec[:,0,0]
 fj_eta = test_spec[:,1,0]
 fj_sdmass = test_spec[:,2,0]
-no_undef = np.sum(target_test,axis=1) == 1
+#no_undef = np.sum(target_test,axis=1) == 1
+no_undef = fj_pt > -999 # no cut
 
-min_pt = 300
-max_pt = 2000
+min_pt = -999 #300
+max_pt = 99999 #2000
 min_eta = -999 # no cut
 max_eta = 999 # no cut
-min_msd = 40
-max_msd = 200
+min_msd = -999 #40
+max_msd = 9999 #200
 
 test_0 = test_0 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
 test_2 = test_2 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
@@ -273,84 +274,3 @@ np.save('%s/prediction_%s.npy'%(outdir,label),prediction)
 print(prediction)
 print(target_test)
 
-fpr, tpr, thresholds = roc_curve(target_test[:,1], prediction[:,1])
-auc = roc_auc_score(target_test[:,1], prediction[:,1])
-
-#fpr_DeepDoubleB = np.load('fpr_DeepDoubleB.npy')
-#tpr_DeepDoubleB = np.load('tpr_DeepDoubleB.npy')
-#dfpr_BDT = np.load('dfpr_BDT.npy')
-#dtpr_BDT = np.load('dtpr_BDT.npy')
-
-
-sig=["Hbb"]
-bkg=["QCD"]
-
-frame = pd.read_pickle('output.pkl')
-print(len(frame))
-no_undef = (frame['truth%s'%sig[0]]+frame['truth%s'%bkg[0]])==1
-frame = frame[(frame.fj_pt > min_pt) & (frame.fj_pt < max_pt) & (frame.fj_sdmass > min_msd) & (frame.fj_sdmass < max_msd) & no_undef]
-print(len(frame))
-
-frame_dec = pd.read_pickle('output_dec.pkl')
-print(len(frame_dec))
-no_undef = (frame_dec['truth%s'%sig[0]]+frame_dec['truth%s'%bkg[0]])==1
-frame_dec = frame_dec[(frame_dec.fj_pt > min_pt) & (frame_dec.fj_pt < max_pt) & (frame_dec.fj_sdmass > min_msd) & (frame_dec.fj_sdmass < max_msd) & no_undef]
-print(len(frame_dec))
-
-#print(frame)
-
-truth_ddb = frame['truth%s'%sig[0]].values
-predict_ddb = frame['predict%s'%sig[0]].values
-truth_ddb_dec = frame_dec['truth%s'%sig[0]].values
-predict_ddb_dec = frame_dec['predict%s'%sig[0]].values
-
-fpr_ddb, tpr_ddb, thresholds_ddb = roc_curve(truth_ddb, predict_ddb)
-auc_ddb = roc_auc_score(truth_ddb, predict_ddb)
-fpr_ddb_dec, tpr_ddb_dec, thresholds_ddb_dec = roc_curve(truth_ddb_dec, predict_ddb_dec)
-auc_ddb_dec = roc_auc_score(truth_ddb_dec, predict_ddb_dec)
-
-f, ax = plt.subplots(figsize=(10, 10))
-ax.set_frame_on(True)
-#fpr_DeepDoubleB = np.load('fpr_DDB_opendata.npy')
-#tpr_DeepDoubleB = np.load('tpr_DDB_opendata.npy')
-#plt.figure(figsize=(12,10), dpi = 200)
-lw = 2
-ax.plot(tpr, fpr, color='blue',
-                 lw=lw, label='Interaction network, AUC = %.1f'%(auc*100.))
-ax.plot(tpr_ddb, fpr_ddb, color='darkorange', lw=lw, label='Deep double-b, AUC = %.1f'%(auc_ddb*100.))
-ax.plot(tpr_ddb_dec, fpr_ddb_dec, color='green', lw=lw, label='Deep double-b mass decor., AUC = %.1f'%(auc_ddb_dec*100.))
-#ax.set_facecolor('white')
-ax.set_xlim(0,1)
-ax.set_ylim(0.001,1)
-
-eraText=r'2016 (13 TeV)'
-xlab = '{} \\rightarrow {}'.format(sig[0][0], sig[0][-2]+'\\bar{'+sig[0][-1]+'}')
-ax.set_xlabel(r'Tagging efficiency ($\mathrm{}$)'.format('{'+xlab+'}'), ha='right', x=1.0)
-ylab = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if l[0][0] in ["H", "Z", "g"] else l for l in bkg ]
-ax.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format("{"+", ".join(ylab)+"}"), ha='right', y=1.0)
-leg = ax.legend(facecolor='white',borderpad=1, frameon=False, loc=2, fontsize=16,
-                            title = ""+str(min_pt)+" $\mathrm{<\ jet\ p_T\ <}$ "+str(max_pt)+" GeV" \
-                          + "\n "+str(min_msd)+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(max_msd)+" GeV"
-                                       )
-import matplotlib.ticker as plticker
-ax.xaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
-ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
-ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12 )
-ax.tick_params(direction='in', axis='both', which='minor' , length=6)
-ax.xaxis.set_ticks_position('both')
-ax.yaxis.set_ticks_position('both')
-ax.semilogy()
-ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
-ax.grid(which='major', alpha=0.9, linestyle='dotted')
-ax.annotate(eraText, xy=(0.80, 1.1), fontname='Helvetica', ha='left',
-                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-ax.annotate('$\mathbf{CMS}$', xy=(0.01, 1.1), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
-                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-ax.annotate('$Simulation\ Open\ Data$', xy=(0.115, 1.1), fontsize=18, fontstyle='italic', ha='left',
-                        annotation_clip=False)
-f.savefig('%s/ROC_curve_data_generator_%s.png'%(outdir,label),dpi=400)
-f.savefig('%s/ROC_curve_data_generator_%s.pdf'%(outdir,label),dpi=400)
-
-np.save('%s/tpr_%s.npy'%(outdir,label), tpr)
-np.save('%s/fpr_%s.npy'%(outdir,label), fpr)
-np.save('%s/thresholds_%s.npy'%(outdir,label), thresholds)
