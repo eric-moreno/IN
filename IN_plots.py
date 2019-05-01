@@ -1,7 +1,7 @@
 import matplotlib as mpl
 mpl.use('agg')
 import numpy as np
-import seaborn as sns
+#import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
 import torch
@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib import rc
 import pandas as pd
+import sys
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rcParams['font.size'] = 22
@@ -71,6 +72,7 @@ print(target_test.shape)
 fj_pt = test_spec[:,0,0]
 fj_eta = test_spec[:,1,0]
 fj_sdmass = test_spec[:,2,0]
+no_undef = np.sum(target_test,axis=1) == 1
 
 min_pt = 300
 max_pt = 2000
@@ -79,11 +81,13 @@ max_eta = 999 # no cut
 min_msd = 40
 max_msd = 200
 
-test_0 = test_0 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) ]
-test_2 = test_2 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) ]
-test_3 = test_3 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) ]
-test_spec = test_spec [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) ]
-target_test = target_test [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) ]
+test_0 = test_0 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
+test_2 = test_2 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
+test_3 = test_3 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
+test_spec = test_spec [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
+target_test = target_test [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef  ]
+
+
 print(test_0.shape)
 print(test_2.shape)
 print(test_3.shape)
@@ -203,10 +207,11 @@ params_sv = params_3
 N = test.shape[2]
 N_sv = test_sv.shape[2]
 
-outdir = 'out'
+outdir = sys.argv[1]
 label = 'new'
 
 # Generate Loss Plot
+'''
 loss_vals_training = np.load('%s/loss_vals_training_%s.npy'%(outdir,label))
 loss_vals_validation = np.load('%s/loss_vals_validation_%s.npy'%(outdir,label))
 loss_std_validation = np.load('%s/loss_std_validation_%s.npy'%(outdir,label))
@@ -229,13 +234,13 @@ plt.savefig('%s/Loss_SV_tracks_data_generator_%s.pdf'%(outdir,label))
 
 plt.figure(figsize=(12, 10), dpi = 200)
 plt.plot(acc_vals_validation)
-sns.set()
+
 plt.title('Accuracy Plain IN (Data Generator)')
 plt.xlabel("Epoch")
 plt.ylabel("Accuracy (%)")
 plt.savefig("%s/Accuracy_SV_tracks_dataGenerator_%s.png"%(outdir,label))
 plt.savefig("%s/Accuracy_SV_tracks_dataGenerator_%s.pdf"%(outdir,label))
-
+'''
 # Generate ROC Plot
 
 prediction = np.array([])
@@ -251,7 +256,7 @@ N = test.shape[2]
 N_sv = test_sv.shape[2]
 n_targets = target_test.shape[1]
 from gnn import GraphNet
-gnn = GraphNet(N, n_targets, len(params), 15, N_sv, len(params_sv), vv_branch=False)
+gnn = GraphNet(N, n_targets, len(params), 15, N_sv, len(params_sv), vv_branch=int(sys.argv[2]))
 gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(outdir,label)))
 
 for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
@@ -276,17 +281,33 @@ auc = roc_auc_score(target_test[:,1], prediction[:,1])
 #dfpr_BDT = np.load('dfpr_BDT.npy')
 #dtpr_BDT = np.load('dtpr_BDT.npy')
 
-frame = pd.read_pickle('output.pkl')
-
-#print(frame)
 
 sig=["Hbb"]
 bkg=["QCD"]
+
+frame = pd.read_pickle('output.pkl')
+print(len(frame))
+no_undef = (frame['truth%s'%sig[0]]+frame['truth%s'%bkg[0]])==1
+frame = frame[(frame.fj_pt > min_pt) & (frame.fj_pt < max_pt) & (frame.fj_sdmass > min_msd) & (frame.fj_sdmass < max_msd) & no_undef]
+print(len(frame))
+
+frame_dec = pd.read_pickle('output_dec.pkl')
+print(len(frame_dec))
+no_undef = (frame_dec['truth%s'%sig[0]]+frame_dec['truth%s'%bkg[0]])==1
+frame_dec = frame_dec[(frame_dec.fj_pt > min_pt) & (frame_dec.fj_pt < max_pt) & (frame_dec.fj_sdmass > min_msd) & (frame_dec.fj_sdmass < max_msd) & no_undef]
+print(len(frame_dec))
+
+#print(frame)
+
 truth_ddb = frame['truth%s'%sig[0]].values
 predict_ddb = frame['predict%s'%sig[0]].values
+truth_ddb_dec = frame_dec['truth%s'%sig[0]].values
+predict_ddb_dec = frame_dec['predict%s'%sig[0]].values
 
 fpr_ddb, tpr_ddb, thresholds_ddb = roc_curve(truth_ddb, predict_ddb)
 auc_ddb = roc_auc_score(truth_ddb, predict_ddb)
+fpr_ddb_dec, tpr_ddb_dec, thresholds_ddb_dec = roc_curve(truth_ddb_dec, predict_ddb_dec)
+auc_ddb_dec = roc_auc_score(truth_ddb_dec, predict_ddb_dec)
 
 f, ax = plt.subplots(figsize=(10, 10))
 ax.set_frame_on(True)
@@ -294,9 +315,10 @@ ax.set_frame_on(True)
 #tpr_DeepDoubleB = np.load('tpr_DDB_opendata.npy')
 #plt.figure(figsize=(12,10), dpi = 200)
 lw = 2
-ax.plot(tpr, fpr, color='darkorange',
+ax.plot(tpr, fpr, color='blue',
                  lw=lw, label='Interaction network, AUC = %.1f'%(auc*100.))
-ax.plot(tpr_ddb, fpr_ddb, color='navy', lw=lw, label='Deep double-b, AUC = %.1f'%(auc_ddb*100.))
+ax.plot(tpr_ddb, fpr_ddb, color='darkorange', lw=lw, label='Deep double-b, AUC = %.1f'%(auc_ddb*100.))
+ax.plot(tpr_ddb_dec, fpr_ddb_dec, color='green', lw=lw, label='Deep double-b mass decor., AUC = %.1f'%(auc_ddb_dec*100.))
 #ax.set_facecolor('white')
 ax.set_xlim(0,1)
 ax.set_ylim(0.001,1)
@@ -318,8 +340,8 @@ ax.tick_params(direction='in', axis='both', which='minor' , length=6)
 ax.xaxis.set_ticks_position('both')
 ax.yaxis.set_ticks_position('both')
 ax.semilogy()
-ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted',color='black')
-ax.grid(which='major', alpha=0.9, linestyle='dotted',color='black')
+ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
+ax.grid(which='major', alpha=0.9, linestyle='dotted')
 ax.annotate(eraText, xy=(0.80, 1.1), fontname='Helvetica', ha='left',
                         bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
 ax.annotate('$\mathbf{CMS}$', xy=(0.01, 1.1), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
