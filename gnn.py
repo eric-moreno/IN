@@ -170,3 +170,6 @@ class GraphNet(nn.Module):
         y_shape = y.size()
         return torch.mm(x.view(-1, x_shape[2]), y).view(-1, x_shape[1], y_shape[1])
 
+
+gnn = GraphNet(60, 2, 30, 15, 5, 14, vv_branch=False)
+    

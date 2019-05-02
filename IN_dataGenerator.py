@@ -145,8 +145,9 @@ from data import H5Data
 files = glob.glob("/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/data_*.h5")
 files_val = files[:5] # take first 5 for validation
 files_train = files[5:] # take rest for training
+
 label = 'new'
-outdir = 'out'
+outdir = sys.argv[1]
 os.system('mkdir -p %s'%outdir)
 
 batch_size = 128
@@ -166,25 +167,6 @@ n_val =data_val.count_data()
 n_train=data_train.count_data()
 print(n_val)
 print(n_train)
-
-def accuracy(predict, target):
-    _, p_vals = torch.max(predict, 1)
-    r = torch.sum(target == p_vals.squeeze(1)).data.numpy()[0]
-    t = target.size()[0]
-    return r * 1.0 / t
-
-def stats(predict, target):
-    _, p_vals = torch.max(predict, 1)
-    t = target.cpu().data.numpy()
-    p_vals = p_vals.squeeze(0).cpu().data.numpy()
-    vals = np.unique(t)
-    for i in vals:
-        ind = np.where(t == i)
-        pv = p_vals[ind]
-        correct = sum(pv == t[ind])
-        #print("  Target %s: %s/%s = %s%%" % (i, correct, len(pv), correct * 100.0/len(pv)))
-    #print("Overall: %s/%s = %s%%" % (sum(p_vals == t), len(t), sum(p_vals == t) * 100.0/len(t)))
-    return sum(p_vals == t) * 100.0/len(t)
 
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
@@ -225,72 +207,12 @@ def loss_kldiv(y_in,x):
     return categorical_crossentropy(y, x) +         LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) +         LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
 
 
-import matplotlib.pyplot as plt
-from sklearn import preprocessing
-import seaborn as sns
-sns.set()
-def get_cmap(n, name='hsv'):
-    '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct 
-    RGB color; the keyword argument name must be a standard mpl colormap name.'''
-    return plt.cm.get_cmap(name, n + 1)
-
-def predicted_histogram(data, 
-                        target, 
-                        labels = None, 
-                        nbins = 10, 
-                        out = None,
-                        xlabel = None,
-                        title = None
-                       ):
-    """@params:
-        data = n x 1 array of parameter values
-        target = n x categories array of predictions
-    """
-    target = preprocessing.normalize(target, norm = "l1")
-    if labels == None:
-        labels = ["" for i in range(target.shape[1])]
-    #1 decide bins
-    ma = np.amax(data) * 1.0
-    mi = np.amin(data)
-    bins = np.linspace(mi, ma, nbins)
-    bin_size = bins[1] - bins[0]
-    bin_locs = np.digitize(data, bins, right = True)
-    #2 set up bin x category matrix
-    #  Each M(bin, category) = Sum over particles with param in bin of category
-    M = np.array([np.sum(target[np.where(bin_locs == i)], axis = 0) 
-                  for i in range(nbins)])
-    #3 plot each category/bin
-    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
-    bars = np.array([M[:, i] for i in range(M.shape[1])])
-    cmap = get_cmap(len(bars), 'viridis')
-    for i in range(len(bars)):
-        ax.bar(bins, bars[i], 
-               bottom = sum(bars[:i]), 
-               color = cmap(i), 
-               label = labels[i],
-               width = bin_size
-              )
-    ax.set_xlabel(xlabel)
-    ax.set_yticks([])
-    ax.set_title(title)
-    ax.legend()
-
 from gnn import GraphNet
 n_targets = target_test.shape[1]
-gnn = GraphNet(N, n_targets, len(params), 15, N_sv, len(params_sv), vv_branch=False)
+gnn = GraphNet(N, n_targets, len(params), 15, N_sv, len(params_sv), vv_branch=int(sys.argv[2]))
 
-def get_sample(training1, training2, target, choice):
-    target_vals = np.argmax(target, axis = 1)
-    ind, = np.where(target_vals == choice)
-    chosen_ind = np.random.choice(ind, 200000)
-    return training1[chosen_ind], training2[chosen_ind], target[chosen_ind]
-
-def get_sample_train(training1, training2, target, choice):
-    target_vals = np.argmax(target, axis = 1)
-    ind, = np.where(target_vals == choice)
-    chosen_ind = ind
-    #chosen_ind = np.random.choice(ind, 200000)
-    return training1[chosen_ind], training2[chosen_ind], target[chosen_ind]
+# pre load best model
+gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
 
 #Test Set
 batch_size =128
@@ -373,7 +295,7 @@ for m in range(n_epochs):
         l_val_best = l_val
         torch.save(gnn.state_dict(), '%s/gnn_%s_best.pth'%(outdir,label))
         
-    #acc_vals_validation[m] = stats(predicted, val_targetv)
+    
     print(val_targetv.shape, predicted.shape)
     print(val_targetv, predicted)
     acc_vals_validation[m] = accuracy_score(val_targetv[:,0],predicted[:,0]>0.5)

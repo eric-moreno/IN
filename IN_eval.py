@@ -13,6 +13,7 @@ from matplotlib import rcParams
 from matplotlib import rc
 import pandas as pd
 import sys
+import setGPU
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rcParams['font.size'] = 22
