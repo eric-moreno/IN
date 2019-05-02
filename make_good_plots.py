@@ -14,6 +14,12 @@ from matplotlib import rc
 import setGPU
 from sklearn.metrics import roc_curve, auc
 import h5py
+from argparse import ArgumentParser
+
+parser = ArgumentParser(description ='Script to evaluate training')
+parser.add_argument("-i", help="Predictions for test dataset (numpy array)", default=None, metavar="FILE")
+parser.add_argument("-o",  help="Eval output directory", default=None, metavar="PATH")
+opts=parser.parse_args()
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rcParams['font.size'] = 22
@@ -668,11 +674,10 @@ def make_plots(outputDir, dataframe, savedir="Plots", taggerName="IN", eraText=r
 from DeepJetCore.DataCollection import DataCollection
 inputTestDataCollection = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_cpf_sv_reduced_dl4jets_test/dataCollection.dc'
 inputTrainDataCollection = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_cpf_sv_reduced_dl4jets_train_val/dataCollection.dc'
-prediction = '/nfshome/emoreno/IN/avikar-surf2017/opendata/IN_out_Run2.npy'
-evalDir = 'IN_Run2'
+prediction = opts.i
+evalDir = opts.o
 
 testd=DataCollection()
 testd.readFromFile(inputTestDataCollection)
 df = evaluate(testd, inputTrainDataCollection, prediction, evalDir, storeInputs=False, adv=False)
 make_plots(evalDir, df, savedir="Plots", taggerName="IN", eraText=r'2016 (13 TeV)')
-print('made plots?')
