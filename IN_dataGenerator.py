@@ -212,11 +212,11 @@ n_targets = target_test.shape[1]
 gnn = GraphNet(N, n_targets, len(params), 15, N_sv, len(params_sv), vv_branch=int(sys.argv[2]))
 
 # pre load best model
-gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
+#gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
 
 #Test Set
 batch_size =128
-n_epochs = 100
+n_epochs = 200
     
 loss = nn.CrossEntropyLoss(reduction='mean')
 optimizer = optim.Adam(gnn.parameters(), lr = 0.0001)

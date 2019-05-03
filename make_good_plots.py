@@ -574,7 +574,7 @@ df = pd.read_pickle('output.pkl')
 print(df.keys())
 df_dec = pd.read_pickle('output_dec.pkl')
 df_in = df.copy(deep=True)
-prediction_in = np.load('out_nocut/prediction_new.npy')
+prediction_in = np.load('%s/prediction_new.npy'%(sys.argv[1]))
 df_in['predictHbb'] = prediction_in[:,1]
 df_in['predictQCD'] = prediction_in[:,0]
 make_plots(evalDir,
