@@ -122,10 +122,10 @@ def main(args):
     DfR = Rx(Do=args.Do, hidden=64, nbins=NBINS)
     
     # pre load best model
-    gnn.load_state_dict(torch.load('out_fixval_2x/gnn_new_best.pth'))
+    gnn.load_state_dict(torch.load('%s/gnn_new_best.pth'%args.preload))
 
-    n_epochs = 200
-    n_epochs_pretrain = 10
+    n_epochs = 100
+    n_epochs_pretrain = 5
     
     loss = nn.CrossEntropyLoss(reduction='mean')
     optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.0001)
@@ -309,6 +309,7 @@ if __name__ == "__main__":
     parser.add_argument("--De", type=int, action='store', dest='De', default = 5, help="De")
     parser.add_argument("--Do", type=int, action='store', dest='Do', default = 6, help="Do")
     parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
+    parser.add_argument("--preload", action='store', dest='preload', default = 'preload', help="preload")
     parser.add_argument("-l","--lambda", type=float, action='store', dest='lam', default = 1, help="lambda")
 
     args = parser.parse_args()

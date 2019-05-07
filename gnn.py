@@ -261,10 +261,12 @@ class Rx(nn.Module):
         super(Rx, self).__init__()
         self.dense1 = nn.Linear(Do, hidden).cuda()
         self.dense2 = nn.Linear(hidden, hidden).cuda()
-        self.dense3 = nn.Linear(hidden, nbins).cuda()
+        self.dense3 = nn.Linear(hidden, hidden).cuda()
+        self.dense4 = nn.Linear(hidden, nbins).cuda()
         
     def forward(self, x):
         n = nn.functional.relu(self.dense1(x))
         n = nn.functional.relu(self.dense2(n))
-        n = self.dense3(n)
+        n = nn.functional.relu(self.dense3(n))
+        n = self.dense4(n)
         return n
