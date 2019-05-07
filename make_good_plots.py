@@ -548,8 +548,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
     plot_rocs(dfs=[cut(frame) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
-              sigs=[['Hbb'],['Hbb'],['Hbb']],
-              bkgs=[['QCD'],['QCD'],['QCD']])
+              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
+              bkgs=[['QCD'],['QCD'],['QCD'],['Hbb']]])
     
     for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
@@ -595,7 +595,7 @@ def main(args):
     df_in_dec['predictQCD'] = prediction_in_dec[:,0]
     make_plots(evalDir,
                [df_in,df_in_dec,df,df_dec],
-               savedirs=["Plots/IN","Plots/IN_dec","Plots/DDB","Plots/DDB_dec"],
+               savedirs=["Plots/IN", "Plots/IN_dec","Plots/DDB","Plots/DDB_dec"],
                taggerNames=["Interaction network", "Interaction network decor.", "Deep double-b", "Deep double-b mass decor."],
                eraText=r'2016 (13 TeV)')
     print('made plots?')
