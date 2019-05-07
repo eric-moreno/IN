@@ -21,7 +21,7 @@ train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA = 0.30 # lambda for penalty
+LAMBDA = 1. # lambda for penalty
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
@@ -117,8 +117,8 @@ def main(args):
     
     from data import H5Data
     files = glob.glob(train_path + "/newdata_*.h5")
-    files_val = files[:5] # take first 5 for validation
-    files_train = files[5:] # take rest for training
+    files_val = files[:1] # take first 5 for validation
+    files_train = files[1:2] # take rest for training
     
     label = 'new'
     outdir = args.outdir
@@ -146,21 +146,25 @@ def main(args):
     print("val data:", n_val)
     print("train data:", n_train)
 
-    from gnn import GraphNet
+    from gnn import GraphNetAdv, Rx
     
-    gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
-                   vv_branch=int(vv_branch),
-                   De=args.De,
-                   Do=args.Do)
-    # pre load best model
-    #gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
+    gnn = GraphNetAdv(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+                      vv_branch=int(vv_branch),
+                      De=args.De,
+                      Do=args.Do)
 
-    #Test Set
-    batch_size =128
-    n_epochs = 200
+    DfR = Rx(Do=args.Do, hidden=64, nbins=NBINS)
+    
+    # pre load best model
+    gnn.load_state_dict(torch.load('out_fixval/gnn_new_best.pth'))
+
+    n_epochs = 10
+    n_epochs_pretrain = 3
     
     loss = nn.CrossEntropyLoss(reduction='mean')
-    optimizer = optim.Adam(gnn.parameters(), lr = 0.0001)
+    optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.0001)
+    opt_DfR = optim.SGD(DfR.parameters(), momentum=0, lr = 0.0001)
+    
     loss_vals_training = np.zeros(n_epochs)
     loss_std_training = np.zeros(n_epochs)
     loss_vals_validation = np.zeros(n_epochs)
@@ -177,6 +181,35 @@ def main(args):
     from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
     softmax = torch.nn.Softmax(dim=1)
 
+    for m in range(n_epochs_pretrain):
+        print("Pretrain epoch %s\n" % m)
+        for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_train.generate_data(),total=n_train/batch_size):
+            training = sub_X[2]
+            training_sv = sub_X[3]
+            target = sub_Y[0]
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
+            trainingv = (torch.FloatTensor(training)).cuda()
+            trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
+            targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
+            targetv_pivot = (torch.from_numpy(spec).long()).cuda()
+
+            # Pretrain adversary
+            gnn.eval()
+            DfR.train()
+            optimizer.zero_grad()
+            opt_DfR.zero_grad()
+            out = gnn(trainingv, trainingv_sv)
+            mask = targetv.le(0.5) # get QCD background
+            masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
+            out_DfR = DfR(masked_out)
+            masked_targetv_pivot = torch.masked_select(targetv_pivot, mask)
+            l_DfR = loss(out_DfR, masked_targetv_pivot)
+            l_DfR.backward()
+            opt_DfR.step()
+            
+            loss_string = "Loss: %s" % "{0:.5f}".format(l_DfR.item())
+            del trainingv, trainingv_sv, targetv, targetv_pivot
+    
     for m in range(n_epochs):
         print("Epoch %s\n" % m)
         #torch.cuda.empty_cache()
@@ -190,38 +223,72 @@ def main(args):
             training = sub_X[2]
             training_sv = sub_X[3]
             target = sub_Y[0]
-            spec = sub_Z[0]
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
-            
+            targetv_pivot = (torch.from_numpy(spec).long()).cuda()
+
+            # Train classifier
+            gnn.train()
+            DfR.eval()
             optimizer.zero_grad()
-            out = gnn(trainingv.cuda(), trainingv_sv.cuda())
-            l = loss(out, targetv.cuda())
-            loss_training.append(l.item())
-            l.backward()
+            opt_DfR.zero_grad()
+            out = gnn(trainingv, trainingv_sv)
+            mask = targetv.le(0.5) # get QCD background
+            masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
+            out_DfR = DfR(masked_out)
+            masked_targetv_pivot = torch.masked_select(targetv_pivot,mask)
+            l = loss(out[0], targetv)
+            l_DfR = loss(out_DfR, masked_targetv_pivot)
+            l_total = l - LAMBDA * l_DfR
+            loss_training.append(l_total.item())
+            l_total.backward()
             optimizer.step()
-            loss_string = "Loss: %s" % "{0:.5f}".format(l.item())
-            del trainingv, trainingv_sv, targetv
+
+            # Train adversary
+            gnn.eval()
+            DfR.train()
+            optimizer.zero_grad()
+            opt_DfR.zero_grad()
+            out = gnn(trainingv, trainingv_sv)
+            mask = targetv.le(0.5) # get QCD background
+            masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
+            out_DfR = DfR(masked_out)
+            l_DfR = loss(out_DfR, masked_targetv_pivot)
+            l_DfR.backward()
+            opt_DfR.step()
+            
+            loss_string = "Loss: %s" % "{0:.5f}".format(l_total.item())
+            del trainingv, trainingv_sv, targetv, targetv_pivot
         
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_val.generate_data(),total=n_val/batch_size):
             training = sub_X[2]
             training_sv = sub_X[3]
             target = sub_Y[0]
-            spec = sub_Z[0]
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
-            
-            out = gnn(trainingv.cuda(), trainingv_sv.cuda())
-            lst.append(softmax(out).cpu().data.numpy())
-            l_val = loss(out, targetv.cuda())
-            loss_val.append(l_val.item())
+            targetv_pivot = (torch.from_numpy(spec).long()).cuda()
+
+            gnn.eval()
+            DfR.eval()                      
+            out = gnn(trainingv, trainingv_sv)
+            mask = targetv.le(0.5) # get QCD background
+            masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
+            out_DfR = DfR(masked_out)
+            lst.append(softmax(out[0]).cpu().data.numpy())
+            l_val = loss(out[0], targetv.cuda())
+            masked_targetv_pivot = torch.masked_select(targetv_pivot, mask)
+            l_DfR_val = loss(out_DfR, masked_targetv_pivot)
+            l_total_val = l_val - LAMBDA * l_DfR_val
+            loss_val.append(l_total_val.item())
             
             targetv_cpu = targetv.cpu().data.numpy()
         
             correct.append(target)
-            del trainingv, trainingv_sv, targetv
+            del trainingv, trainingv_sv, targetv, targetv_pivot
         
         l_val = np.mean(np.array(loss_val))
     

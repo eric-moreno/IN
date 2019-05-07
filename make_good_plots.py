@@ -14,6 +14,7 @@ from matplotlib import rc
 import setGPU
 from sklearn.metrics import roc_curve, auc
 import h5py
+import argparse
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rcParams['font.size'] = 22
@@ -119,7 +120,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
           + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{sd}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
                        )
         leg._legend_box.align = "left"
-        ax.annotate(eraText, xy=(0.80, 1.1), fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 1.1), fontname='Helvetica', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         ax.annotate('$\mathbf{CMS}$', xy=(0.01, 1.1), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -134,7 +135,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         plt.close(f)
 
 
-    def sculpting(tdf, siglab="Hcc", sculp_label='Light', savedir=""):
+    def sculpting(tdf, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""):
         if siglab == sculp_label: return 
         def find_nearest(array,value):
             idx = (np.abs(array-value)).argmin()
@@ -154,16 +155,21 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         fpr, tpr, threshold = roc_curve(truth, predict)
 
         cuts = {}
-        for wp in [0.01, 0.05, 0.1, 0.25, 0.5, 1.0]: # % mistag rate
+        for wp in [0.01, 0.05, 0.1, 0.5, 1.0]: # % mistag rate
             idx, val = find_nearest(fpr, wp)
             cuts[str(wp)] = threshold[idx] # threshold for deep double-b corresponding to ~1% mistag rate
         
         f, ax = plt.subplots(figsize=(10,10))
-        bins = np.linspace(40,200,17)
+        bins = np.linspace(40,200,9)
         for wp, cut in reversed(sorted(cuts.items())):
             ctdf = tdf[tdf['predict'+siglab].values > cut]
             weight = ctdf['truth'+sculp_label].values
-            ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=True,histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
+            if str(wp)=='1.0':
+                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='No tagging applied')
+            else:
+                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
         
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
         ax.set_ylabel(r'Normalized scale ({})'.format(legend_bkglab), ha='right', y=1.0)
@@ -172,7 +178,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10))
         ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
         ax.set_xlim(40, 200)
-        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12, labelleft=False )
+        ax.set_ylim(0, 0.45)
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax.xaxis.set_ticks_position('both')
         ax.yaxis.set_ticks_position('both')    
@@ -181,9 +188,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         leg = ax.legend(borderpad=1, frameon=False, loc='best', fontsize=16,
             title = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV" \
               + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
-                  + "\n Tagging {}".format(legend_siglab)           )
+                  + "\n {} tagging {}".format(taggerName, legend_siglab)           )
         leg._legend_box.align = "right"
-        ax.annotate(eraText, xy=(0.8, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
                         bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
                         bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -193,11 +200,12 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir,'M_sculpting_tag'+siglab+"_"+sculp_label+'.pdf'), dpi=400)
         #return
         f, ax = plt.subplots(figsize=(10,10))
-        bins = np.linspace(300,2000,35)
+        bins = np.linspace(300,2000,20)
         for wp, cut in reversed(sorted(cuts.items())):
             ctdf = tdf[tdf['predict'+siglab].values > cut]
             weight = ctdf['truth'+sculp_label].values
-            ax.hist(ctdf['fj_pt'].values, bins=bins, weights = weight, lw=2, normed=True,histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
+            ax.hist(ctdf['fj_pt'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                    histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
         
         ax.set_xlabel(r'$\mathrm{p_T\ [GeV]}$', ha='right', x=1.0)
         #ax.set_ylabel(r'Normalized scale ({})'.format(sculp_label.replace("Hcc", r"$\mathrm{H \rightarrow c\bar{c}}$").replace("Hbb", r"$\mathrm{H \rightarrow b\bar{b}}$")), ha='right', y=1.0)
@@ -207,7 +215,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=50))
         ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
         ax.set_xlim(300, 2000)
-        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12, labelleft=False )
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax.xaxis.set_ticks_position('both')
         ax.yaxis.set_ticks_position('both')    
@@ -218,7 +226,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
               + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{sd}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"\
                 + "\n Tagging {}".format(legend_siglab)           )
         leg._legend_box.align = "right"
-        ax.annotate(eraText, xy=(0.8, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -229,7 +237,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir,'Pt_sculpting_tag'+siglab+"_"+sculp_label+'.png'), dpi=400)
         plt.close(f)
 
-    def eta_dep(xdf, sig_label="Hcc", bkg_label="", savedir=""):
+    def eta_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
         if sig_label == bkg_label: return 
         def roc(xdf, etalow=300, etahigh=2500, verbose=False):
             tdf = xdf[(xdf.fj_eta < etahigh) & (xdf.fj_eta>etalow)]
@@ -308,7 +316,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.annotate( mpt, xy=(0.05, 0.88), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         leg._legend_box.align = "right"
-        ax.annotate(eraText, xy=(0.8, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -320,7 +328,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         plt.close(f)
         
 
-    def pt_dep(xdf, sig_label="Hcc", bkg_label="", savedir=""):
+    def pt_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
         if sig_label == bkg_label: return 
         def roc(xdf, ptlow=300, pthigh=2500, verbose=False):
             tdf = xdf[(xdf.fj_pt < pthigh) & (xdf.fj_pt>ptlow)]
@@ -376,7 +384,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         
         ax.set_xlabel(r'$\mathrm{p_T\ [GeV]}$', ha='right', x=1.0)
         ylab1 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [sig_label] ][0]
-        ax.set_ylabel(r'Tagging efficiency ($\mathrm{}$)'.format("{"+ylab1+"}"), ha='right', y=1.0, color='black')
+        ax.set_ylabel(r'{} tagging efficiency ($\mathrm{}$)'.format(taggerName,"{"+ylab1+"}"), ha='right', y=1.0, color='black')
         #ax.set_ylabel(r'Tagging efficiency ({})'.format(sig_label.replace("Hcc", r"$\mathrm{H \rightarrow c\bar{c}}$").replace("Hbb", r"$\mathrm{H \rightarrow b\bar{b}}$")), ha='right', y=1.0, color='black')
         ylab2 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [bkg_label] ][0]
         ax2.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format("{"+ylab2+"}"), ha='right', y=1.0, color='red')
@@ -400,7 +408,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.annotate( mpt, xy=(0.05, 0.88), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         leg._legend_box.align = "right"
-        ax.annotate(eraText, xy=(0.8, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -460,15 +468,19 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             for tru, weight in zip(truths, trus):
                 if app_weight:
                     if tru == "":
-                        ax.hist(pred, bins=bins, weights = weight*xdf.Weight, alpha=a, normed=True, label="")# Mock plot
+                        ax.hist(pred, bins=bins, weights = weight*xdf.Weight/np.sum(weight*xdf.Weight),
+                                alpha=a, normed=False, label="")# Mock plot
                     else:
-                        ax.hist(pred, bins=bins, weights = weight*xdf.Weight, alpha=a, normed=True, 
+                        ax.hist(pred, bins=bins, weights = weight*xdf.Weight/np.sum(weight*xdf.Weight),
+                                alpha=a, normed=False,
                             label=r'Weighted $\mathrm{}$'.format('{'+legend_labels[all_labels.index(tru)]+'}') )    
                 else: 
                     if tru == "":
-                        ax.hist(pred, bins=bins, weights = weight, alpha=a, normed=True, label="")# Mock plot
+                        ax.hist(pred, bins=bins, weights = weight/np.sum(weight),
+                                alpha=a, normed=False, label="")# Mock plot
                     else:
-                        ax.hist(pred, bins=bins, weights = weight, alpha=a, normed=True, 
+                        ax.hist(pred, bins=bins, weights = weight/np.sum(weight),
+                                alpha=a, normed=False, 
                         label=r'$\mathrm{}$'.format('{'+legend_labels[all_labels.index(tru)]+'}') )    
 
             if feature == "m":
@@ -515,7 +527,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                   + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
                                )
             leg._legend_box.align = "left"
-            ax.annotate(eraText, xy=(0.8, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+            ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
                 bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
             ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
                 bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -551,9 +563,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 plot_rocs(dfs=[frame], savedir=savedir, names=[taggerName], 
                           sigs=[[label]], 
                           bkgs=[[label2]])
-                sculpting(frame, siglab=label, sculp_label=label2, savedir=savedir)
-                pt_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2)
-                eta_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2)
+                sculpting(frame, siglab=label, sculp_label=label2, savedir=savedir, taggerName=taggerName)
+                pt_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
+                eta_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
                                 
             plot_rocs(dfs=[frame], savedir=savedir, names=[taggerName], 
                       sigs=[[label]],
@@ -567,19 +579,36 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 overlay_distribution(frame, savedir=savedir, feature=feature , truths=truths, app_weight=False)
 
     print("Finished Plotting")
-    
-evalDir = 'IN_Run2'
 
-df = pd.read_pickle('output.pkl')
-print(df.keys())
-df_dec = pd.read_pickle('output_dec.pkl')
-df_in = df.copy(deep=True)
-prediction_in = np.load('%s/prediction_new.npy'%(sys.argv[1]))
-df_in['predictHbb'] = prediction_in[:,1]
-df_in['predictQCD'] = prediction_in[:,0]
-make_plots(evalDir,
-           [df_in,df,df_dec],
-           savedirs=["Plots/IN","Plots/DDB","Plots/DDB_dec"],
-           taggerNames=["Interaction network", "Deep double-b", "Deep double-b mass decor."],
-           eraText=r'2016 (13 TeV)')
-print('made plots?')
+def main(args):
+    evalDir = args.outdir 
+
+    df = pd.read_pickle('output.pkl')
+    df_dec = pd.read_pickle('output_dec.pkl')
+    df_in = df.copy(deep=True)
+    prediction_in = np.load('%s/prediction_new.npy'%(args.indir))
+    df_in['predictHbb'] = prediction_in[:,1]
+    df_in['predictQCD'] = prediction_in[:,0]
+    df_in_dec = df.copy(deep=True)
+    prediction_in_dec = np.load('%s/prediction_new.npy'%(args.indecdir))
+    df_in_dec['predictHbb'] = prediction_in_dec[:,1]
+    df_in_dec['predictQCD'] = prediction_in_dec[:,0]
+    make_plots(evalDir,
+               [df_in,df_in_dec,df,df_dec],
+               savedirs=["Plots/IN","Plots/IN_dec","Plots/DDB","Plots/DDB_dec"],
+               taggerNames=["Interaction network", "Interaction network decor.", "Deep double-b", "Deep double-b mass decor."],
+               eraText=r'2016 (13 TeV)')
+    print('made plots?')
+
+if __name__ == "__main__":
+    """ This is executed when run from the command line """
+    parser = argparse.ArgumentParser()
+    
+    # Required positional arguments
+    parser.add_argument("indir", help="IN results dir")
+    parser.add_argument("indecdir", help="IN decor results dir")
+    
+    parser.add_argument("-o", "--outdir", action='store', dest='outdir', default = 'IN_Run2', help="outdir")
+
+    args = parser.parse_args()
+    main(args)
