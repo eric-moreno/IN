@@ -18,7 +18,6 @@ import argparse
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 test_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
-NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
 
@@ -119,7 +118,7 @@ def main(args):
                       De=args.De,
                       Do=args.Do)
 
-    DfR = Rx(Do=args.Do, hidden=64, nbins=NBINS)
+    DfR = Rx(Do=args.Do, hidden=64, nbins=args.nbins)
     
     # pre load best model
     gnn.load_state_dict(torch.load('%s/gnn_new_best.pth'%args.preload))
@@ -153,7 +152,7 @@ def main(args):
             training = sub_X[2]
             training_sv = sub_X[3]
             target = sub_Y[0]
-            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,args.nbins+1), right=False)-1
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
@@ -189,7 +188,7 @@ def main(args):
             training = sub_X[2]
             training_sv = sub_X[3]
             target = sub_Y[0]
-            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,args.nbins+1), right=False)-1
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
@@ -232,7 +231,7 @@ def main(args):
             training = sub_X[2]
             training_sv = sub_X[3]
             target = sub_Y[0]
-            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,NBINS+1), right=False)-1
+            spec = np.digitize(sub_Z[0][:,0,2], bins=np.linspace(MMIN,MMAX,args.nbins+1), right=False)-1
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
@@ -311,6 +310,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
     parser.add_argument("--preload", action='store', dest='preload', default = 'preload', help="preload")
     parser.add_argument("-l","--lambda", type=float, action='store', dest='lam', default = 1, help="lambda")
+    parser.add_argument("--nbins", type=int, action='store', dest='nbins', default = 40, help="nbins")
 
     args = parser.parse_args()
     main(args)
