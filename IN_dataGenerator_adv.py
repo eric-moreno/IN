@@ -21,7 +21,6 @@ train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA = 1. # lambda for penalty
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
@@ -75,39 +74,6 @@ params_3 = ['sv_ptrel',
           'sv_costhetasvpv'
          ]
 
-def loss_kldiv(y_in,x):
-    """
-    mass sculpting penlaty term using kullback_leibler_divergence
-    y_in: truth [h, y]
-    x: predicted NN output for y
-    h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
-    y: the truth categorical labels  "one-hot encoded" (length NClasses=2)
-    """
-    h = y_in[:,0:NBINS]
-    y = y_in[:,NBINS:NBINS+2]
-    
-    # build mass histogram for true q events weighted by q, b prob
-    h_alltag_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
-    # build mass histogram for true b events weighted by q, b prob
-    h_alltag_b = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
-    
-    # select mass histogram for true q events weighted by q prob; normalize
-    h_qtag_q = h_alltag_q[:,0]
-    h_qtag_q = h_qtag_q / K.sum(h_qtag_q,axis=0)
-    # select mass histogram for true q events weighted by b prob; normalize
-    h_btag_q = h_alltag_q[:,1]
-    h_btag_q = h_btag_q / K.sum(h_btag_q,axis=0)
-    # select mass histogram for true b events weighted by q prob; normalize        
-    h_qtag_b = h_alltag_b[:,0]
-    h_qtag_b = h_qtag_b / K.sum(h_qtag_b,axis=0)
-    # select mass histogram for true b events weighted by b prob; normalize        
-    h_btag_b = h_alltag_b[:,1]
-    h_btag_b = h_btag_b / K.sum(h_btag_b,axis=0)
-
-    # compute KL divergence between true q events weighted by b vs q prob (symmetrize?)
-    # compute KL divergence between true b events weighted by b vs q prob (symmetrize?)
-    return categorical_crossentropy(y, x) +         LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) +         LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
-
 def main(args):
     """ Main entry point of the app """
     
@@ -117,8 +83,8 @@ def main(args):
     
     from data import H5Data
     files = glob.glob(train_path + "/newdata_*.h5")
-    files_val = files[:1] # take first 5 for validation
-    files_train = files[1:2] # take rest for training
+    files_val = files[:5] # take first 5 for validation
+    files_train = files[5:] # take rest for training
     
     label = 'new'
     outdir = args.outdir
@@ -156,10 +122,10 @@ def main(args):
     DfR = Rx(Do=args.Do, hidden=64, nbins=NBINS)
     
     # pre load best model
-    gnn.load_state_dict(torch.load('out_fixval/gnn_new_best.pth'))
+    gnn.load_state_dict(torch.load('out_fixval_2x/gnn_new_best.pth'))
 
-    n_epochs = 10
-    n_epochs_pretrain = 3
+    n_epochs = 200
+    n_epochs_pretrain = 10
     
     loss = nn.CrossEntropyLoss(reduction='mean')
     optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.0001)
@@ -241,7 +207,7 @@ def main(args):
             masked_targetv_pivot = torch.masked_select(targetv_pivot,mask)
             l = loss(out[0], targetv)
             l_DfR = loss(out_DfR, masked_targetv_pivot)
-            l_total = l - LAMBDA * l_DfR
+            l_total = l - args.lam * l_DfR
             loss_training.append(l_total.item())
             l_total.backward()
             optimizer.step()
@@ -282,7 +248,7 @@ def main(args):
             l_val = loss(out[0], targetv.cuda())
             masked_targetv_pivot = torch.masked_select(targetv_pivot, mask)
             l_DfR_val = loss(out_DfR, masked_targetv_pivot)
-            l_total_val = l_val - LAMBDA * l_DfR_val
+            l_total_val = l_val - args.lam * l_DfR_val
             loss_val.append(l_total_val.item())
             
             targetv_cpu = targetv.cpu().data.numpy()
@@ -343,6 +309,7 @@ if __name__ == "__main__":
     parser.add_argument("--De", type=int, action='store', dest='De', default = 5, help="De")
     parser.add_argument("--Do", type=int, action='store', dest='Do', default = 6, help="Do")
     parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
+    parser.add_argument("-l","--lambda", type=float, action='store', dest='lam', default = 1, help="lambda")
 
     args = parser.parse_args()
     main(args)

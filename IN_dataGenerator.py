@@ -21,7 +21,6 @@ train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA = 0.30 # lambda for penalty
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
@@ -74,39 +73,6 @@ params_3 = ['sv_ptrel',
           'sv_d3dsig',
           'sv_costhetasvpv'
          ]
-
-def loss_kldiv(y_in,x):
-    """
-    mass sculpting penlaty term using kullback_leibler_divergence
-    y_in: truth [h, y]
-    x: predicted NN output for y
-    h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
-    y: the truth categorical labels  "one-hot encoded" (length NClasses=2)
-    """
-    h = y_in[:,0:NBINS]
-    y = y_in[:,NBINS:NBINS+2]
-    
-    # build mass histogram for true q events weighted by q, b prob
-    h_alltag_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
-    # build mass histogram for true b events weighted by q, b prob
-    h_alltag_b = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
-    
-    # select mass histogram for true q events weighted by q prob; normalize
-    h_qtag_q = h_alltag_q[:,0]
-    h_qtag_q = h_qtag_q / K.sum(h_qtag_q,axis=0)
-    # select mass histogram for true q events weighted by b prob; normalize
-    h_btag_q = h_alltag_q[:,1]
-    h_btag_q = h_btag_q / K.sum(h_btag_q,axis=0)
-    # select mass histogram for true b events weighted by q prob; normalize        
-    h_qtag_b = h_alltag_b[:,0]
-    h_qtag_b = h_qtag_b / K.sum(h_qtag_b,axis=0)
-    # select mass histogram for true b events weighted by b prob; normalize        
-    h_btag_b = h_alltag_b[:,1]
-    h_btag_b = h_btag_b / K.sum(h_btag_b,axis=0)
-
-    # compute KL divergence between true q events weighted by b vs q prob (symmetrize?)
-    # compute KL divergence between true b events weighted by b vs q prob (symmetrize?)
-    return categorical_crossentropy(y, x) +         LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) +         LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
 
 def main(args):
     """ Main entry point of the app """
