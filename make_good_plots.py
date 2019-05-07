@@ -549,7 +549,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
               sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
-              bkgs=[['QCD'],['QCD'],['QCD'],['Hbb']]])
+              bkgs=[['QCD'],['QCD'],['QCD'],['Hbb']])
     
     for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
