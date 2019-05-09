@@ -123,11 +123,11 @@ def main(args):
     # pre load best model
     gnn.load_state_dict(torch.load('%s/gnn_new_best.pth'%args.preload))
 
-    n_epochs = 100
+    n_epochs = 30
     n_epochs_pretrain = 5
     
     loss = nn.CrossEntropyLoss(reduction='mean')
-    optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.0001)
+    optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.00001)
     opt_DfR = optim.SGD(DfR.parameters(), momentum=0, lr = 0.0001)
     
     loss_vals_training = np.zeros(n_epochs)
@@ -282,7 +282,7 @@ def main(args):
         if m > 5 and all(loss_vals_validation[max(0, m - 5):m] > min(np.append(loss_vals_validation[0:max(0, m - 5)], 200))):
             print('Early Stopping...')
             print(loss_vals_training, '\n', np.diff(loss_vals_training))
-            break
+            #break
         print()
 
     acc_vals_validation = acc_vals_validation[:(final_epoch)]
