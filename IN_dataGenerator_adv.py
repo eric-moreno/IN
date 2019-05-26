@@ -123,17 +123,29 @@ def main(args):
     # pre load best model
     gnn.load_state_dict(torch.load('%s/gnn_new_best.pth'%args.preload))
 
-    n_epochs = 30
+    n_epochs = 100
     n_epochs_pretrain = 5
     
     loss = nn.CrossEntropyLoss(reduction='mean')
-    optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.00001)
-    opt_DfR = optim.SGD(DfR.parameters(), momentum=0, lr = 0.0001)
+    #optimizer = optim.SGD(gnn.parameters(), momentum=0, lr = 0.00001)
+    #opt_DfR = optim.SGD(DfR.parameters(), momentum=0, lr = 0.0001)
+    optimizer = optim.Adam(gnn.parameters(), lr = 0.00001)
+    opt_DfR = optim.Adam(DfR.parameters(), lr = 0.0001)
     
     loss_vals_training = np.zeros(n_epochs)
     loss_std_training = np.zeros(n_epochs)
     loss_vals_validation = np.zeros(n_epochs)
     loss_std_validation = np.zeros(n_epochs)
+    
+    loss_G_vals_training = np.zeros(n_epochs)
+    loss_G_std_training = np.zeros(n_epochs)
+    loss_G_vals_validation = np.zeros(n_epochs)
+    loss_G_std_validation = np.zeros(n_epochs)
+
+    loss_R_vals_training = np.zeros(n_epochs)
+    loss_R_std_training = np.zeros(n_epochs)
+    loss_R_vals_validation = np.zeros(n_epochs)
+    loss_R_std_validation = np.zeros(n_epochs)
 
     acc_vals_training = np.zeros(n_epochs)
     acc_vals_validation = np.zeros(n_epochs)
@@ -181,7 +193,11 @@ def main(args):
         final_epoch = m
         lst = []
         loss_val = []
+        loss_G_val = []
+        loss_R_val = []
         loss_training = []
+        loss_G_training = []
+        loss_R_training = []
         correct = []
     
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_train.generate_data(),total=n_train/batch_size):
@@ -207,7 +223,6 @@ def main(args):
             l = loss(out[0], targetv)
             l_DfR = loss(out_DfR, masked_targetv_pivot)
             l_total = l - args.lam * l_DfR
-            loss_training.append(l_total.item())
             l_total.backward()
             optimizer.step()
 
@@ -223,7 +238,22 @@ def main(args):
             l_DfR = loss(out_DfR, masked_targetv_pivot)
             l_DfR.backward()
             opt_DfR.step()
-            
+
+            # record losses after both updates
+            gnn.eval()
+            DfR.eval()
+            out = gnn(trainingv, trainingv_sv)
+            mask = targetv.le(0.5) # get QCD background
+            masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
+            out_DfR = DfR(masked_out)                                    
+            l = loss(out[0], targetv)
+            l_DfR = loss(out_DfR, masked_targetv_pivot)
+            l_total = l - args.lam * l_DfR
+                                    
+            loss_training.append(l_total.item())
+            loss_G_training.append(l.item())
+            loss_R_training.append(l_DfR.item())
+
             loss_string = "Loss: %s" % "{0:.5f}".format(l_total.item())
             del trainingv, trainingv_sv, targetv, targetv_pivot
         
@@ -243,25 +273,28 @@ def main(args):
             mask = targetv.le(0.5) # get QCD background
             masked_out = torch.masked_select(out[1].transpose(0,1), mask).view(args.Do, -1).transpose(0,1)
             out_DfR = DfR(masked_out)
-            lst.append(softmax(out[0]).cpu().data.numpy())
-            l_val = loss(out[0], targetv.cuda())
             masked_targetv_pivot = torch.masked_select(targetv_pivot, mask)
+            l_val = loss(out[0], targetv.cuda())
             l_DfR_val = loss(out_DfR, masked_targetv_pivot)
             l_total_val = l_val - args.lam * l_DfR_val
-            loss_val.append(l_total_val.item())
-            
             targetv_cpu = targetv.cpu().data.numpy()
-        
+            
+            lst.append(softmax(out[0]).cpu().data.numpy())
             correct.append(target)
+            
+            loss_val.append(l_total_val.item())
+            loss_G_val.append(l_val.item())
+            loss_R_val.append(l_DfR_val.item())            
+            
             del trainingv, trainingv_sv, targetv, targetv_pivot
         
         l_val = np.mean(np.array(loss_val))
-    
-        predicted = np.concatenate(lst) #(torch.FloatTensor(np.concatenate(lst))).to(device)
         print('\nValidation Loss: ', l_val)
-
+    
         l_training = np.mean(np.array(loss_training))
         print('Training Loss: ', l_training)
+        
+        predicted = np.concatenate(lst) #(torch.FloatTensor(np.concatenate(lst))).to(device)
         val_targetv = np.concatenate(correct) #torch.FloatTensor(np.array(correct)).cuda()
         
         torch.save(gnn.state_dict(), '%s/gnn_%s_last.pth'%(outdir,label))
@@ -277,8 +310,16 @@ def main(args):
         print("Validation Accuracy: ", acc_vals_validation[m])
         loss_vals_training[m] = l_training
         loss_vals_validation[m] = l_val
-        loss_std_validation[m] = np.std(np.array(loss_val))
+        loss_G_vals_training[m] = np.mean(np.array(loss_G_training))
+        loss_G_vals_validation[m] = np.mean(np.array(loss_G_val))
+        loss_R_vals_training[m] = np.mean(np.array(loss_R_training))
+        loss_R_vals_validation[m] = np.mean(np.array(loss_R_val))
         loss_std_training[m] = np.std(np.array(loss_training))
+        loss_std_validation[m] = np.std(np.array(loss_val))
+        loss_G_std_training[m] = np.std(np.array(loss_G_training))
+        loss_G_std_validation[m] = np.std(np.array(loss_G_val))
+        loss_R_std_training[m] = np.std(np.array(loss_R_training))
+        loss_R_std_validation[m] = np.std(np.array(loss_R_val))
         if m > 5 and all(loss_vals_validation[max(0, m - 5):m] > min(np.append(loss_vals_validation[0:max(0, m - 5)], 200))):
             print('Early Stopping...')
             print(loss_vals_training, '\n', np.diff(loss_vals_training))
@@ -288,13 +329,30 @@ def main(args):
     acc_vals_validation = acc_vals_validation[:(final_epoch)]
     loss_vals_training = loss_vals_training[:(final_epoch)]
     loss_vals_validation = loss_vals_validation[:(final_epoch)]
+    loss_G_vals_training = loss_G_vals_training[:(final_epoch)]
+    loss_G_vals_validation = loss_G_vals_validation[:(final_epoch)]
+    loss_R_vals_training = loss_R_vals_training[:(final_epoch)]
+    loss_R_vals_validation = loss_R_vals_validation[:(final_epoch)]
     loss_std_validation = loss_std_validation[:(final_epoch)]
     loss_std_training = loss_std_training[:(final_epoch)]
+    loss_G_std_validation = loss_G_std_validation[:(final_epoch)]
+    loss_G_std_training = loss_G_std_training[:(final_epoch)]
+    loss_R_std_validation = loss_R_std_validation[:(final_epoch)]
+    loss_R_std_training = loss_R_std_training[:(final_epoch)]
     np.save('%s/acc_vals_validation_%s.npy'%(outdir,label),acc_vals_validation)
     np.save('%s/loss_vals_training_%s.npy'%(outdir,label),loss_vals_training)
     np.save('%s/loss_vals_validation_%s.npy'%(outdir,label),loss_vals_validation)
+    np.save('%s/loss_G_vals_training_%s.npy'%(outdir,label),loss_G_vals_training)
+    np.save('%s/loss_G_vals_validation_%s.npy'%(outdir,label),loss_G_vals_validation)
+    np.save('%s/loss_R_vals_training_%s.npy'%(outdir,label),loss_R_vals_training)
+    np.save('%s/loss_R_vals_validation_%s.npy'%(outdir,label),loss_R_vals_validation)
     np.save('%s/loss_std_validation_%s.npy'%(outdir,label),loss_std_validation)
     np.save('%s/loss_std_training_%s.npy'%(outdir,label),loss_std_training)
+    np.save('%s/loss_G_std_validation_%s.npy'%(outdir,label),loss_G_std_validation)
+    np.save('%s/loss_G_std_training_%s.npy'%(outdir,label),loss_G_std_training)
+    np.save('%s/loss_R_std_validation_%s.npy'%(outdir,label),loss_R_std_validation)
+    np.save('%s/loss_R_std_training_%s.npy'%(outdir,label),loss_R_std_training)
+    
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """

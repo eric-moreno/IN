@@ -121,8 +121,6 @@ def main(args):
     # pre load best model
     #gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
 
-    #Test Set
-    batch_size =128
     n_epochs = 200
     
     loss = nn.CrossEntropyLoss(reduction='mean')

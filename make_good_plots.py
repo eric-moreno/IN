@@ -593,11 +593,46 @@ def main(args):
     prediction_in_dec = np.load('%s/prediction_new.npy'%(args.indecdir))
     df_in_dec['predictHbb'] = prediction_in_dec[:,1]
     df_in_dec['predictQCD'] = prediction_in_dec[:,0]
+
+    # Generate Loss Plot
+    def plot_loss(indir,outdir):
+        loss_vals_training = np.load('%s/loss_vals_training_new.npy'%indir)
+        loss_vals_validation = np.load('%s/loss_vals_validation_new.npy'%indir)
+        loss_std_training = np.load('%s/loss_std_training_new.npy'%indir)
+        loss_std_validation = np.load('%s/loss_std_validation_new.npy'%indir)
+        epochs = np.array(range(len(loss_vals_training)))
+        fig = plt.figure(figsize = (12,10))
+        ax1 = fig.add_subplot(111)
+        ax1.plot(epochs, loss_vals_training, label='Training')
+        ax1.plot(epochs, loss_vals_validation, label='Validation', color = 'green')
+        #ax1.fill_between(epochs, loss_vals_validation - loss_std_validation,
+        #                 loss_vals_validation + loss_std_validation, color = 'lightgreen',
+        #                 label = r'Validation $\pm$ 1 std. dev.')
+        #ax1.fill_between(epochs, loss_vals_training - loss_std_training,
+        #                 loss_vals_training + loss_std_training, color = 'lightblue',
+        #                 label = 'Training $\pm$ 1 std. dev.')
+        plt.legend(loc='upper right')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.savefig('%s/Loss_%s.png'%(outdir,indir.replace('/','')))
+        plt.savefig('%s/Loss_%s.pdf'%(outdir,indir.replace('/','')))
+        plt.close(fig)
+
+    plot_loss(args.indir,args.outdir)
+    #plot_loss(args.indecdir,args.outdir)
     make_plots(evalDir,
                [df_in,df_in_dec,df,df_dec],
                savedirs=["Plots/IN", "Plots/IN_dec","Plots/DDB","Plots/DDB_dec"],
                taggerNames=["Interaction network", "Interaction network decor.", "Deep double-b", "Deep double-b mass decor."],
                eraText=r'2016 (13 TeV)')
+
+    #make_plots(evalDir,
+    #           [df_in,df,df_dec],
+    #           savedirs=["Plots/IN","Plots/DDB","Plots/DDB_dec"],
+    #           taggerNames=["Interaction network", "Deep double-b", "Deep double-b mass decor."],
+    #           eraText=r'2016 (13 TeV)')
+
+    
     print('made plots?')
 
 if __name__ == "__main__":
