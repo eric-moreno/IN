@@ -15,6 +15,7 @@ import setGPU
 from sklearn.metrics import roc_curve, auc
 import h5py
 import argparse
+import glob
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rcParams['font.size'] = 22
@@ -446,8 +447,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             
         def roc(xdf, pulow=0, puhigh=50, verbose=False):
             # npv
+            tdf = xdf[(xdf.npv < puhigh) & (xdf.npv >= pulow)]
             # ntrueInt
-            tdf = xdf[(xdf.npv < puhigh) & (xdf.npv>pulow)]
+            #tdf = xdf[(xdf.ntrueInt < puhigh) & (xdf.ntrueInt >= pulow)]            
             truth, predict, db = roc_input(tdf, signal=[sig_label], include = [sig_label, bkg_label])
             fpr, tpr, threshold = roc_curve(truth, predict)
             return fpr, tpr
@@ -641,7 +643,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=16,
                 title = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV" \
                   + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
-                               )
+                            + "\n "+taggerName)
             leg._legend_box.align = "left"
             ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
                 bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -712,6 +714,20 @@ def main(args):
     df_in_dec['predictHbb'] = prediction_in_dec[:,1]
     df_in_dec['predictQCD'] = prediction_in_dec[:,0]
 
+    # to add ntrueInt
+    #save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test_moreinfo/'
+    #test_spec_arrays = []
+    #for test_file in sorted(glob.glob(save_path + 'test_*_spectators_0.npy')):
+    #    test_spec_arrays.append(np.load(test_file))
+    #    test_spec = np.concatenate(test_spec_arrays)
+    #test_spec = np.swapaxes(test_spec, 1, 2)
+    #ntrueInt = test_spec[:,-1,0]
+    #df['ntrueInt'] = ntrueInt
+    #df_dec['ntrueInt'] = ntrueInt
+    #df_in['ntrueInt'] = ntrueInt
+    #df_in_dec['ntrueInt'] = ntrueInt
+    #print(df[['npv','ntrueInt']])
+          
     # Generate Loss Plot
     def plot_loss(indir,outdir, taggerName="", eraText=""):
         loss_vals_training = np.load('%s/loss_vals_training_new.npy'%indir)
