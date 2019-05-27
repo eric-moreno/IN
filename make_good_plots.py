@@ -238,7 +238,14 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         plt.close(f)
 
     def eta_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
-        if sig_label == bkg_label: return 
+        if sig_label == bkg_label: return
+            
+        if sig_label[0] in ["H", "Z", "g"] and len(sig_label) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(sig_label[0], sig_label[-2]+'\\bar{'+sig_label[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = sig_label
+            
         def roc(xdf, etalow=300, etahigh=2500, verbose=False):
             tdf = xdf[(xdf.fj_eta < etahigh) & (xdf.fj_eta>etalow)]
             truth, predict, db = roc_input(tdf, signal=[sig_label], include = [sig_label, bkg_label])
@@ -261,9 +268,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             effloose.append(tpr[ix])
             ix, mistag =  find_nearest(fpr, 0.01)
             efftight.append(tpr[ix])
-            ix, eff =  find_nearest(tpr, 0.8)
+            ix, eff =  find_nearest(tpr, 0.9)
             misloose.append(fpr[ix])
-            ix, eff =  find_nearest(tpr, 0.4)
+            ix, eff =  find_nearest(tpr, 0.5)
             mistight.append(fpr[ix])
 
         # Pad endpoints
@@ -277,8 +284,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f, ax = plt.subplots(figsize=(10,10))
         ax.step(pts, effloose, lw=2, label='10\% mistagging rate', c='black', where='post')
         ax.step(pts, efftight, lw=2, label='1\% mistagging rate', c='black', linestyle='dashed')
-        ax.step([],[], label='80\% efficiency', c='red', where='post')
-        ax.step([],[], label='40\% efficiency', c='red', where='post', linestyle='dashed')
+        ax.step([],[], label='90\% efficiency', c='red', where='post')
+        ax.step([],[], label='50\% efficiency', c='red', where='post', linestyle='dashed')
         
         ax2 = ax.twinx()
         ax2.step(pts, mistight, lw=2, label='40\% efficiency', c='red', where='post', linestyle='dashed')
@@ -290,7 +297,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax2.yaxis.set_ticks_position('right')
         ax2.tick_params('y', which='both', colors='red')
         ax2.semilogy()
-        ax2.set_ylim(0.001, 2)
+        ax2.set_ylim(0.0002, 1)
         
         ax.set_xlabel(r'$\mathrm{\eta}$', ha='right', x=1.0)
         ylab1 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [sig_label] ][0]
@@ -304,7 +311,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.yaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
         ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
         ax.set_xlim(-2.5, 2.5)
-        ax.set_ylim(0, 1.2)
+        ax.set_ylim(0, 1.3)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax.xaxis.set_ticks_position('both')
@@ -312,8 +319,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
         ax.grid(which='major', alpha=0.9, linestyle='dotted')
         leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=16 )
-        mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
-        ax.annotate( mpt, xy=(0.05, 0.88), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV" + "\n {}".format(taggerName)
+        ax.annotate( mpt, xy=(0.05, 0.85), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         leg._legend_box.align = "right"
         ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
@@ -329,7 +336,14 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         
 
     def pt_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
-        if sig_label == bkg_label: return 
+        if sig_label == bkg_label: return
+            
+        if sig_label[0] in ["H", "Z", "g"] and len(sig_label) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(sig_label[0], sig_label[-2]+'\\bar{'+sig_label[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = sig_label
+            
         def roc(xdf, ptlow=300, pthigh=2500, verbose=False):
             tdf = xdf[(xdf.fj_pt < pthigh) & (xdf.fj_pt>ptlow)]
             truth, predict, db = roc_input(tdf, signal=[sig_label], include = [sig_label, bkg_label])
@@ -352,9 +366,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             effloose.append(tpr[ix])
             ix, mistag =  find_nearest(fpr, 0.01)
             efftight.append(tpr[ix])
-            ix, eff =  find_nearest(tpr, 0.8)
+            ix, eff =  find_nearest(tpr, 0.9)
             misloose.append(fpr[ix])
-            ix, eff =  find_nearest(tpr, 0.4)
+            ix, eff =  find_nearest(tpr, 0.5)
             mistight.append(fpr[ix])
 
         # Pad endpoints
@@ -369,22 +383,22 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         
         ax.step(pts, effloose, lw=2, label='10\% mistagging rate', c='black', where='post')
         ax.step(pts, efftight, lw=2, label='1\% mistagging rate', c='black', linestyle='dashed')
-        ax.step([],[], label='80\% efficiency', c='red', where='post')
-        ax.step([],[], label='40\% efficiency', c='red', where='post', linestyle='dashed')
+        ax.step([],[], label='90\% efficiency', c='red', where='post')
+        ax.step([],[], label='50\% efficiency', c='red', where='post', linestyle='dashed')
         
         ax2 = ax.twinx()
-        ax2.step(pts, mistight, lw=2, label='40\% efficiency', c='red', where='post', linestyle='dashed')
-        ax2.step(pts, misloose, lw=2, label='80\% efficiency', c='red', where='post')
+        ax2.step(pts, mistight, lw=2, label='50\% efficiency', c='red', where='post', linestyle='dashed')
+        ax2.step(pts, misloose, lw=2, label='90\% efficiency', c='red', where='post')
         ax2.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
         ax2.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax2.yaxis.set_ticks_position('right')
         ax2.tick_params('y', which='both', colors='red')
         ax2.semilogy()
-        ax2.set_ylim(0.001, 2)
+        ax2.set_ylim(0.0002, 1)
         
         ax.set_xlabel(r'$\mathrm{p_T\ [GeV]}$', ha='right', x=1.0)
         ylab1 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [sig_label] ][0]
-        ax.set_ylabel(r'{} tagging efficiency ($\mathrm{}$)'.format(taggerName,"{"+ylab1+"}"), ha='right', y=1.0, color='black')
+        ax.set_ylabel(r'Tagging efficiency ($\mathrm{}$)'.format("{"+ylab1+"}"), ha='right', y=1.0, color='black')
         #ax.set_ylabel(r'Tagging efficiency ({})'.format(sig_label.replace("Hcc", r"$\mathrm{H \rightarrow c\bar{c}}$").replace("Hbb", r"$\mathrm{H \rightarrow b\bar{b}}$")), ha='right', y=1.0, color='black')
         ylab2 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [bkg_label] ][0]
         ax2.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format("{"+ylab2+"}"), ha='right', y=1.0, color='red')
@@ -396,7 +410,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.yaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
         ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
         ax.set_xlim(300, 2000)
-        ax.set_ylim(0, 1.2)
+        ax.set_ylim(0, 1.3)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax.xaxis.set_ticks_position('both')
@@ -404,8 +418,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
         ax.grid(which='major', alpha=0.9, linestyle='dotted')
         leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=16 )
-        mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
-        ax.annotate( mpt, xy=(0.05, 0.88), xycoords='axes fraction', fontname='Helvetica', ha='left',
+        mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV" + "\n {}".format(taggerName)
+        ax.annotate( mpt, xy=(0.05, 0.85), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         leg._legend_box.align = "right"
         ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
@@ -419,7 +433,109 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir,'Pt_dep_'+sig_label+"_vs_"+bkg_label+'.png'), dpi=400)
         f.savefig(os.path.join(savedir,'Pt_dep_'+sig_label+"_vs_"+bkg_label+'.pdf'), dpi=400)
         plt.close(f)
-   
+
+        
+    def pu_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
+        if sig_label == bkg_label: return
+            
+        if sig_label[0] in ["H", "Z", "g"] and len(sig_label) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(sig_label[0], sig_label[-2]+'\\bar{'+sig_label[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = sig_label
+            
+        def roc(xdf, pulow=0, puhigh=50, verbose=False):
+            # npv
+            # ntrueInt
+            tdf = xdf[(xdf.npv < puhigh) & (xdf.npv>pulow)]
+            truth, predict, db = roc_input(tdf, signal=[sig_label], include = [sig_label, bkg_label])
+            fpr, tpr, threshold = roc_curve(truth, predict)
+            return fpr, tpr
+        
+        step = 5
+        pts = np.arange(0,50,step)
+
+
+        efftight, effloose = [], []
+        mistight, misloose = [], []
+        def find_nearest(array,value):
+                idx = (np.abs(array-value)).argmin()
+                return idx, array[idx]
+
+        for pu in pts:
+            fpr, tpr = roc(xdf, pu,pu+step)
+            ix, mistag =  find_nearest(fpr, 0.1)
+            effloose.append(tpr[ix])
+            ix, mistag =  find_nearest(fpr, 0.01)
+            efftight.append(tpr[ix])
+            ix, eff =  find_nearest(tpr, 0.9)
+            misloose.append(fpr[ix])
+            ix, eff =  find_nearest(tpr, 0.5)
+            mistight.append(fpr[ix])
+
+        # Pad endpoints
+        pts = np.concatenate((np.array([0]), pts))
+        pts = np.concatenate((pts, np.array([50])))
+        effloose = [effloose[0]] + effloose + [effloose[-1]]
+        efftight = [efftight[0]] + efftight + [efftight[-1]]
+        misloose = [misloose[0]] + misloose + [misloose[-1]]
+        mistight = [mistight[0]] + mistight + [mistight[-1]]
+
+        f, ax = plt.subplots(figsize=(10,10))
+        
+        ax.step(pts, effloose, lw=2, label='10\% mistagging rate', c='black', where='post')
+        ax.step(pts, efftight, lw=2, label='1\% mistagging rate', c='black', linestyle='dashed')
+        ax.step([],[], label='90\% efficiency', c='red', where='post')
+        ax.step([],[], label='50\% efficiency', c='red', where='post', linestyle='dashed')
+        
+        ax2 = ax.twinx()
+        ax2.step(pts, mistight, lw=2, label='90\% efficiency', c='red', where='post', linestyle='dashed')
+        ax2.step(pts, misloose, lw=2, label='50\% efficiency', c='red', where='post')
+        ax2.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
+        ax2.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax2.yaxis.set_ticks_position('right')
+        ax2.tick_params('y', which='both', colors='red')
+        ax2.semilogy()
+        ax2.set_ylim(0.0002, 1)
+        
+        ax.set_xlabel(r'Reconstructed primary vertices', ha='right', x=1.0)
+        ylab1 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [sig_label] ][0]
+        ax.set_ylabel(r'Tagging efficiency ($\mathrm{}$)'.format("{"+ylab1+"}"), ha='right', y=1.0, color='black')
+        #ax.set_ylabel(r'Tagging efficiency ({})'.format(sig_label.replace("Hcc", r"$\mathrm{H \rightarrow c\bar{c}}$").replace("Hbb", r"$\mathrm{H \rightarrow b\bar{b}}$")), ha='right', y=1.0, color='black')
+        ylab2 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [bkg_label] ][0]
+        ax2.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format("{"+ylab2+"}"), ha='right', y=1.0, color='red')
+        #ax2.set_ylabel(r'Mistagging rate ({})'.format(bkg_label.replace("Hcc", r"$\mathrm{H \rightarrow c\bar{c}}$").replace("Hbb", r"$\mathrm{H \rightarrow b\bar{b}}$")), ha='right', y=1.0, color='red')
+        ax2.get_yaxis().set_label_coords(1.05,1)
+        import matplotlib.ticker as plticker
+        ax.xaxis.set_major_locator(plticker.MultipleLocator(base=10))
+        ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=2))
+        ax.yaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
+        ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
+        ax.set_xlim(0, 50)
+        ax.set_ylim(0, 1.3)
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
+        ax.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('left')    
+        #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
+        ax.grid(which='major', alpha=0.9, linestyle='dotted')
+        leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=16 )
+        mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV" + "\n {}".format(taggerName)
+        ax.annotate( mpt, xy=(0.05, 0.85), xycoords='axes fraction', fontname='Helvetica', ha='left',
+            bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        leg._legend_box.align = "right"
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+            bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+            bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.015), xycoords='axes fraction', fontsize=18, fontstyle='italic', ha='left',
+            annotation_clip=False)
+
+        
+        f.savefig(os.path.join(savedir,'PU_dep_'+sig_label+"_vs_"+bkg_label+'.png'), dpi=400)
+        f.savefig(os.path.join(savedir,'PU_dep_'+sig_label+"_vs_"+bkg_label+'.pdf'), dpi=400)
+        plt.close(f)
+        
     def overlay_distribution(xdf, savedir="", feature='pt' ,truths=["Hcc", "QCD"], app_weight=True):  
             all_labels = ["QCD", "Light", "Hbb", "Hcc", "gbb", "gcc", "Zbb", "Zcc"]    
             trus = []
@@ -560,6 +676,8 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         for label in labels:
             for label2 in labels:
                 if label == label2: continue
+                    
+                pu_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
                 plot_rocs(dfs=[frame], savedir=savedir, names=[taggerName], 
                           sigs=[[label]], 
                           bkgs=[[label2]])
@@ -595,31 +713,46 @@ def main(args):
     df_in_dec['predictQCD'] = prediction_in_dec[:,0]
 
     # Generate Loss Plot
-    def plot_loss(indir,outdir):
+    def plot_loss(indir,outdir, taggerName="", eraText=""):
         loss_vals_training = np.load('%s/loss_vals_training_new.npy'%indir)
         loss_vals_validation = np.load('%s/loss_vals_validation_new.npy'%indir)
         loss_std_training = np.load('%s/loss_std_training_new.npy'%indir)
         loss_std_validation = np.load('%s/loss_std_validation_new.npy'%indir)
         epochs = np.array(range(len(loss_vals_training)))
-        fig = plt.figure(figsize = (12,10))
-        ax1 = fig.add_subplot(111)
-        ax1.plot(epochs, loss_vals_training, label='Training')
-        ax1.plot(epochs, loss_vals_validation, label='Validation', color = 'green')
-        #ax1.fill_between(epochs, loss_vals_validation - loss_std_validation,
+        f, ax = plt.subplots(figsize=(10, 10))
+        ax.plot(epochs, loss_vals_training, label='Training')
+        ax.plot(epochs, loss_vals_validation, label='Validation', color = 'green')
+        #ax.fill_between(epochs, loss_vals_validation - loss_std_validation,
         #                 loss_vals_validation + loss_std_validation, color = 'lightgreen',
         #                 label = r'Validation $\pm$ 1 std. dev.')
-        #ax1.fill_between(epochs, loss_vals_training - loss_std_training,
+        #ax.fill_between(epochs, loss_vals_training - loss_std_training,
         #                 loss_vals_training + loss_std_training, color = 'lightblue',
         #                 label = 'Training $\pm$ 1 std. dev.')
-        plt.legend(loc='upper right')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.savefig('%s/Loss_%s.png'%(outdir,indir.replace('/','')))
-        plt.savefig('%s/Loss_%s.pdf'%(outdir,indir.replace('/','')))
-        plt.close(fig)
+        leg = ax.legend(loc='upper right', title=taggerName, borderpad=1, frameon=False, fontsize=16)
+        leg._legend_box.align = "right"
+        
+        
+        ax.set_ylabel('Loss')
+        ax.set_xlabel('Epoch')
+        ax.set_xlim(0,np.max(epochs))
+        #ymin = min(np.min(loss_vals_training),np.min(loss_vals_validation))
+        #ymax = max(np.min(loss_vals_training),np.max(loss_vals_validation))
+        #ax.set_ylim(ymin, ymax)
+        
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+            bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+            bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.015), xycoords='axes fraction', fontsize=18, fontstyle='italic', ha='left',
+            annotation_clip=False)
+        
+        f.savefig('%s/Loss_%s.png'%(outdir,indir.replace('/','')))
+        f.savefig('%s/Loss_%s.pdf'%(outdir,indir.replace('/','')))
+        plt.close(f)
 
-    plot_loss(args.indir,args.outdir)
-    #plot_loss(args.indecdir,args.outdir)
+    plot_loss(args.indir,args.outdir, taggerName="Interaction network", eraText=r'2016 (13 TeV)')
+    plot_loss(args.indecdir,args.outdir, taggerName="Interaction network decor.", eraText=r'2016 (13 TeV)')
+    
     make_plots(evalDir,
                [df_in,df_in_dec,df,df_dec],
                savedirs=["Plots/IN", "Plots/IN_dec","Plots/DDB","Plots/DDB_dec"],
