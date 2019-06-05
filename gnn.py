@@ -1,5 +1,4 @@
 import itertools
-from sklearn import utils
 import torch
 import torch.nn as nn
 from torch.autograd.variable import *
