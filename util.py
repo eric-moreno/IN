@@ -1,31 +1,27 @@
-import ROOT as r
 import numpy as np
-import os, sys, ast, type_func, cPickle
+import os, sys, ast, type_func, pickle
 import pandas as pd
 import h5py
 from random import random
 import itertools
-r.gSystem.Load("libDelphes")
-r.gInterpreter.Declare('#include "classes/DelphesClasses.h"')
-r.gInterpreter.Declare('#include "external/ExRootAnalysis/ExRootTreeReader.h"')
-r.gInterpreter.Declare('#include "external/ExRootAnalysis/ExRootResult.h"')
+
 params = ['Px', 'Py', 'Pz', 'PT', 'E', 'D0', 'DZ', 'X', 'Y', 'Z']
 max_len = 100
 nothing = "[]"
 jet_type_num = {0:'higgs', 1: 'top', 2: 'Z', 3: 'W+', 4: 'strange', 100: nothing}
-jet_type = {v: k for k, v in jet_type_num.iteritems()}
+jet_type = {v: k for k, v in jet_type_num.items()}
 POI = {6:'top', 25:'higgs', 23:'Z', 3: 'strange', 24:'W+'}
 
 def print_attrs(object):
-    print "\n".join(dir(object))
+    print("\n".join(dir(object)))
 
 def print_trefarray(array):
     num_entries = array.GetEntries()
-    print "["
+    print("[")
     for i in range(num_entries):
-        print " ", str(array.At(i)) + ",\n",
-    print " ", array.At(num_entries - 1)
-    print "]"
+        print(" ", str(array.At(i)) + ",\n",)
+    print(" ", array.At(num_entries - 1))
+    print("]")
 
 def tref_array_to_numpy(array):
     num_entries = array.GetEntries()
@@ -102,7 +98,7 @@ def muon_to_dict(muon, event, jet, params = ["PT"]):
     d['jet'] = jet
     d['track'] = False
     d['muon'] = True
-    #print muon.Particle.GetObject()
+    #print(muon.Particle.GetObject())
     return d
 
 def get_mother_list(particle, branch_particle, mom_list = []):
@@ -188,44 +184,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     sys.stdout.flush()
     # Print New Line on Complete
     if iteration == total: 
-        print 
-def create_genjet_df(fname, do_one = False, filter_nothing = True):
-    chain = r.TChain("Delphes")
-    chain.Add(fname)
-    #want to read chain, including Delphes information
-    tree_reader = r.ExRootTreeReader(chain)
-
-    branch_genjet = tree_reader.UseBranch("GenJet")
-    #branch_fastjet = tree_reader.UseBranch("FastJet")
-    branch_particle = tree_reader.UseBranch("Particle")
-    branch_muon = tree_reader.UseBranch("Muon")
-    branch_eflow_track = tree_reader.UseBranch("EFlowTrack")
-    num_entries = tree_reader.GetEntries()
-    if do_one:  #debugging
-        num_entries = 10
-    events = {}
-    id_counter = 0
-    for i in range(num_entries):
-        tree_reader.ReadEntry(i)
-        genjets = tref_array_to_numpy(branch_genjet)
-        moms = [get_jet_parents(jet, branch_particle) for jet in genjets]
-        events[i] = [constituent_method(c, i, j, moms) for j, jet in enumerate(genjets)
-                                                  for c in tref_array_to_numpy(jet.Constituents)]
-        printProgressBar(i, num_entries)
-    print "Finished reading file..........%s" % fname
-    particle_dicts = [events[i][j]
-                      for i in range(len(events))
-                      for j in range(len(events[i]))
-                      if events[i][j] != {}
-                     ]
-    df = pd.DataFrame.from_records(particle_dicts)
-    df = df_njet_index(df)
-    if filter_nothing:
-        print "Filtering out nothings..."
-        #df = df_filter_nothing(df)
-        df = df[df.parents != nothing]
-    df['count'] = df.groupby('njet')['parents'].transform('count')
-    return df
+        print()
 
 def df_filter_nothing(df):
     dfs = filter_jet_list(df_get_jet_list(df))
@@ -239,33 +198,14 @@ def combine_dfs(dfs):
     df = pd.concat(dfs)
     return df
 
-def create_genjet_combo_h5(fnames):
-    dfs = [create_genjet_h5(i) for i in fnames]
-    df = combine_dfs(dfs)
-    fname = fnames[0]
-    out = fname.split('.root')[0] + '_combo.h5'
-    print "Outputting to " + out
-    df.to_hdf(out, 'df', format = 'table')
-    print "h5 file written to " + out
-    return df
-
-def create_genjet_h5(fname):
-    out = fname.split('.root')[0] + '.h5'
-    print "Generating dataframe..."
-    df = create_genjet_df(fname)
-    print "Outputting to " + out
-    df.to_hdf(out, 'df', format = 'table')
-    print "h5 file written to " + out
-    return df
-
 def h5_to_target(fname, output = None, params = params, max_len = max_len):
     df = h5_to_df(fname)
     return df_to_target(df, output, params, max_len = max_len)
 
 def h5_to_df(fname, jet_dict_file = None):
-    print "reading file"
+    print("reading file")
     df = pd.read_hdf(fname)
-    print "Generate dictionary"
+    print("Generate dictionary")
     types = sorted(list(set(df.parents.values)))
     if jet_dict_file == None:
         jet_dict = {}
@@ -273,12 +213,12 @@ def h5_to_df(fname, jet_dict_file = None):
             #l = int(raw_input(i + ": "))
             j = ast.literal_eval(i)
             l = type_func.get_type(j)
-            print j, l
+            print(j, l)
             jet_dict[i] = l
-        cPickle.dump(jet_dict, open('jet_dict.pkl', 'wb'))
+        pickle.dump(jet_dict, open('jet_dict.pkl', 'wb'))
     else:
-        jet_dict = cPickle.load(open(jet_dict_file, 'rb'))
-    print "Assigning jet_type..."
+        jet_dict = pickle.load(open(jet_dict_file, 'rb'))
+    print("Assigning jet_type...")
     df['mom'] = df['parents'].map(jet_dict)
     df['count'] = df.groupby('njet')['parents'].transform('count')
     return df
@@ -292,9 +232,9 @@ def pad_values(vals, val = 0, max_len = max_len):
 def print_accuracy( p, target ):
     p_cat = np.argmax(p,axis=1)
     test_target = np.argmax(target, axis = 1)
-    print "Fraction of good prediction"
-    print len(np.where( p_cat == test_target)[0])
-    print len(np.where( p_cat == test_target )[0])/float(len(p_cat)),"%"
+    print("Fraction of good prediction")
+    print(len(np.where( p_cat == test_target)[0]))
+    print(len(np.where( p_cat == test_target )[0])/float(len(p_cat)),"%")
 
 def accuracy(p, target):
     p_cat = np.argmax(p,axis=1)
@@ -318,7 +258,7 @@ def df_njet_index(df):
 def df_get_jet_list(df):
     """Return a list of dataframes based on jet number"""
     groups = df.groupby('njet')
-    print "Generated groupby object"
+    print("Generated groupby object")
     dfs = [groups.get_group(i) for i in groups.groups.keys()] 
     return dfs
     
@@ -332,21 +272,21 @@ def df_to_target(df, output = None, params = params, max_len = max_len):
     training_target = np.array([get_list_from_num(i[0, 1], length = 1 + ma)
                         for i in np.split(moms, np.where(np.diff(moms[:, 0]))[0] + 1)])
     return training, training_target
-    print "lookup"
+    print("lookup")
     dfs = df.groupby('njet')
     jets = df.njet.unique()
     jet_sub = np.random.choice(jets, 100, replace = False)
-    print "got jets"
+    print("got jets")
     training = np.array([pad_values(dfs.get_group(i)[params].sort_values(['D0', 'DZ', 'PT'], 
                                                               ascending = False).values) 
                                                                          for i in jet_sub])
-    print "got training"
+    print("got training")
     if output == None:
         training_target = np.array([get_list_from_num(get_jet_num(dfs.get_group(i))) 
                                         for i in jet_sub])
     else:
         training_target = np.array([output for i in range(len(training))])
-    print "to numpy"
+    print("to numpy")
     #training = np.array([pad_values(i) for i in training])
     return training, training_target
                
@@ -371,7 +311,7 @@ def assign_jet_type(df, jet_dict):
 
 def make_test_split(training, target, test_size = 200):
     """Split training/target into training/target and test/target"""
-    print training.shape, target.shape
+    print(training.shape, target.shape)
     num = training.shape[0]
     indices = np.random.choice(range(num), test_size, replace = False)
     test = training[indices]
