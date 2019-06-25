@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib import rc
 import setGPU
-
 from sklearn.metrics import roc_curve, auc, accuracy_score
 import scipy
 import h5py
@@ -31,7 +30,6 @@ rcParams['text.latex.preamble'] = [
 ]  
 rc('text', usetex=True)
 
-
 def make_dirs(dirname):
     import os, errno
     """
@@ -39,13 +37,11 @@ def make_dirs(dirname):
     """
     try:
     	os.makedirs(dirname)
-
     except:
         print("pass")
     
 def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], eraText=r'2016 (13 TeV)'):
     print("Making standard plots")
-
 
     def cut(tdf, ptlow=300, pthigh=2000):
         mlow, mhigh = 40, 200
@@ -57,7 +53,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         mlow, mhigh = 40, 200
         cdf = tdf[(tdf.fj_eta < etahigh) & (tdf.fj_eta>etalow) &(tdf.fj_sdmass < mhigh) & (tdf.fj_sdmass>mlow)]
         return cdf
-      
+
     def roc_input(frame, signal=["HCC"], include = ["HCC", "Light", "gBB", "gCC", "HBB"], norm=False):       
         # Bkg def - filter unwanted
         bkg = np.zeros(frame.shape[0])    
@@ -90,16 +86,13 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         for frame, name, sig, bkg in zip(dfs, names, sigs, bkgs):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
             fpr, tpr, threshold = roc_curve(truth, predict)
-
             
             ax.plot(tpr, fpr, lw=2.5, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
-
             ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
             for ind in range(len(tpr)):
                             ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
             ROCtext.close()
             print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
-
             
         ax.set_xlim(0,1)
         ax.set_ylim(0.001,1)
@@ -333,10 +326,11 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
         plt.close(f)
-        sys.exit()
+        #sys.exit()
 
-
-    def sculpting(tdf, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""):
+    def make_DDT(tdf, FPR_cut, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
+        
+        print('Setting DDT cut to {}%'.format(FPR_cut))
         if siglab == sculp_label: return 
         def find_nearest(array,value):
             idx = (np.abs(array-value)).argmin()
@@ -351,31 +345,69 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
             legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
         else: legend_bkglab = sculp_label
-
-        truth, predict, db = roc_input(tdf, signal=[siglab], include = [siglab, sculp_label])
-        fpr, tpr, threshold = roc_curve(truth, predict)
-
-        cuts = {}
-
-        for wp in [0.01, 0.05, 0.1, 0.5, 1.0]: # % mistag rate
-            idx, val = find_nearest(fpr, wp)
-            cuts[str(wp)] = threshold[idx] # threshold for deep double-b corresponding to ~1% mistag rate
+            
+        # Placing events in bins to detemine threshold for each individual bin
+        binned_events = []
         
-        f, ax = plt.subplots(figsize=(10,10))
-
-        bins = np.linspace(40,200,9)
-        for wp, cut in reversed(sorted(cuts.items())):
-            ctdf = tdf[tdf['predict'+siglab].values > cut]
-            weight = ctdf['truth'+sculp_label].values
-            if str(wp)=='1.0':
-                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
-                        histtype='step',label='No tagging applied')
+        NBINS= 8 # number of bins for loss function
+        MMAX = 200. # max value
+        MMIN = 40. # min value
+        
+        for nbin in range(NBINS): 
+            binned_events.append([]) 
+           
+        binWidth = (MMAX - MMIN) / NBINS
+        masses = tdf['fj_sdmass'].values
+        for event in range(len(tdf)):
+            if masses[event] < MMIN: 
+                binned_events[0].append(event)
+            elif masses[event] > MMAX: 
+                binned_events[-1].append(event)
             else:
-                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
-                        histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
-      
+                binned_events[int((masses[event]-MMIN)/binWidth)].append(tdf.index[event])
+        
+        fprs = []
+        tprs = []
+        thresholds = []
+  
+        for i in range(NBINS):
+            truth, predict, db = roc_input(tdf.reindex(binned_events[i]), signal=['QCD'], include = ['QCD', 'Hbb'])
+            fpr, tpr, threshold = roc_curve(truth, predict)
+            fprs.append(fpr)
+            tprs.append(tpr)
+            thresholds.append(threshold)
+       
+        # Determining cuts for each bin
+        big_cuts = []
+        bins = np.linspace(40,200,9)
+        for i in range(NBINS): 
+            cuts = {}
+            for wp in [FPR_cut/100]: # % mistag rate
+                idx, val = find_nearest(fprs[i], wp)
+                cuts[str(wp)] = thresholds[i][idx] # threshold for tagger corresponding to ~0.05% mistag rate
+            big_cuts.append(cuts)
+   
+        f, ax = plt.subplots(figsize=(10,10))
+        
+        
+        # Plot QCD distribution at 5% cut
+        ctdf = tdf.copy()
+        ctdf = ctdf.head(0)
+        for i in range(NBINS): 
+            for wp, cut in reversed(sorted(big_cuts[i].items())):
+                ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'QCD'].values > cut])
+        
+        weight = ctdf['truth'+'QCD'].values
+        ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+       
+        weight_uncut = tdf['truth'+'QCD'].values
+        ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
+                        histtype='step',label='No FPR Cut QCD')
+                                
+                                
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
-        ax.set_ylabel(r'Normalized scale ({})'.format(legend_bkglab), ha='right', y=1.0)
+        ax.set_ylabel(r'Normalized scale ({})'.format('QCD'), ha='right', y=1.0)
         import matplotlib.ticker as plticker
         ax.xaxis.set_major_locator(plticker.MultipleLocator(base=20))
         ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10))
@@ -401,6 +433,118 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.015), xycoords='axes fraction', fontsize=18, fontstyle='italic', ha='left',
 
                         annotation_clip=False)
+        f.savefig(os.path.join(savedir,'DDT_QCD_tag'+'QCD_cut' + '.png'), dpi=400)
+        f.savefig(os.path.join(savedir,'DDT_QCD_tag'+'QCD_cut' + '.pdf'), dpi=400)
+        
+        
+        # Plot Hbb distribution with the same 5% QCD cut
+        f, ax = plt.subplots(figsize=(10,10))
+        ctdf = tdf.copy()
+        ctdf = ctdf.head(0)
+        for i in range(NBINS): 
+            for wp, cut in reversed(sorted(big_cuts[i].items())):
+                ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'Hbb'].values > cut])
+        
+        weight = ctdf['truth'+'Hbb'].values
+        ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut Hbb'.format(FPR_cut))
+       
+        weight_uncut = tdf['truth'+'Hbb'].values
+        ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
+                        histtype='step',label='No FPR Cut Hbb')
+                                
+                                
+        ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
+        ax.set_ylabel(r'Normalized scale ({})'.format('Hbb'), ha='right', y=1.0)
+        import matplotlib.ticker as plticker
+        ax.xaxis.set_major_locator(plticker.MultipleLocator(base=20))
+        ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10))
+        ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
+        ax.set_xlim(40, 200)
+        ax.set_ylim(0, 0.45)
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
+
+        ax.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('both')    
+        #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
+        ax.grid(which='major', alpha=0.9, linestyle='dotted')
+        leg = ax.legend(borderpad=1, frameon=False, loc='best', fontsize=16,
+            title = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV" \
+              + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
+                  + "\n {} tagging {}".format(taggerName, legend_siglab)           )
+        leg._legend_box.align = "right"
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.015), xycoords='axes fraction', fontsize=18, fontstyle='italic', ha='left',
+
+                        annotation_clip=False)
+        f.savefig(os.path.join(savedir,'DDT_Hbb_tag'+'QCD_cut' + '.png'), dpi=400)
+        f.savefig(os.path.join(savedir,'DDT_Hbb_tag'+'QCD_cut' + '.pdf'), dpi=400)
+        
+    def sculpting(tdf, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""):
+        if siglab == sculp_label: return 
+        def find_nearest(array,value):
+            idx = (np.abs(array-value)).argmin()
+            return idx, array[idx]
+        
+        if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = siglab
+        if sculp_label[0] in ["H", "Z", "g"] and len(sculp_label) == 3:
+            legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
+            legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
+        else: legend_bkglab = sculp_label
+
+        truth, predict, db = roc_input(tdf, signal=[siglab], include = [siglab, sculp_label])
+        fpr, tpr, threshold = roc_curve(truth, predict)
+
+        cuts = {}
+        for wp in [0.01, 0.05, 0.1, 0.5, 1.0]: # % mistag rate
+            idx, val = find_nearest(fpr, wp)
+            cuts[str(wp)] = threshold[idx] # threshold for deep double-b corresponding to ~1% mistag rate
+        
+        f, ax = plt.subplots(figsize=(10,10))
+        bins = np.linspace(40,200,9)
+        for wp, cut in reversed(sorted(cuts.items())):
+            ctdf = tdf[tdf['predict'+siglab].values > cut]
+            weight = ctdf['truth'+sculp_label].values
+            if str(wp)=='1.0':
+                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='No tagging applied')
+            else:
+                ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
+                        histtype='step',label='{}\%  mistagging rate'.format(float(wp)*100.))
+        
+        ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
+        ax.set_ylabel(r'Normalized scale ({})'.format(legend_bkglab), ha='right', y=1.0)
+        import matplotlib.ticker as plticker
+        ax.xaxis.set_major_locator(plticker.MultipleLocator(base=20))
+        ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10))
+        ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
+        ax.set_xlim(40, 200)
+        ax.set_ylim(0, 0.45)
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
+        ax.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('both')    
+        #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
+        ax.grid(which='major', alpha=0.9, linestyle='dotted')
+        leg = ax.legend(borderpad=1, frameon=False, loc='best', fontsize=16,
+            title = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV" \
+              + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
+                  + "\n {} tagging {}".format(taggerName, legend_siglab)           )
+        leg._legend_box.align = "right"
+        ax.annotate(eraText, xy=(0.75, 1.015), xycoords='axes fraction', fontname='Helvetica', ha='left',
+                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(0, 1.015), xycoords='axes fraction', fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+                        bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.015), xycoords='axes fraction', fontsize=18, fontstyle='italic', ha='left',
+                        annotation_clip=False)
         f.savefig(os.path.join(savedir,'M_sculpting_tag'+siglab+"_"+sculp_label+'.png'), dpi=400)
         f.savefig(os.path.join(savedir,'M_sculpting_tag'+siglab+"_"+sculp_label+'.pdf'), dpi=400)
         #return
@@ -421,7 +565,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
         ax.set_xlim(300, 2000)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
-
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
         ax.xaxis.set_ticks_position('both')
         ax.yaxis.set_ticks_position('both')    
@@ -441,7 +584,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
 
         
         f.savefig(os.path.join(savedir,'Pt_sculpting_tag'+siglab+"_"+sculp_label+'.png'), dpi=400)
-
         plt.close(f)
 
     def eta_dep(xdf, sig_label="Hcc", bkg_label="", savedir="", taggerName=""):
@@ -453,7 +595,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         else:
             legend_siglab = sig_label
             
-
         def roc(xdf, etalow=300, etahigh=2500, verbose=False):
             tdf = xdf[(xdf.fj_eta < etahigh) & (xdf.fj_eta>etalow)]
             truth, predict, db = roc_input(tdf, signal=[sig_label], include = [sig_label, bkg_label])
@@ -506,7 +647,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax2.tick_params('y', which='both', colors='red')
         ax2.semilogy()
         ax2.set_ylim(0.0002, 1)
-
         
         ax.set_xlabel(r'$\mathrm{\eta}$', ha='right', x=1.0)
         ylab1 = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if len(l) == 3 and l[0] in ["H", "Z", "g"] else l for l in [sig_label] ][0]
@@ -520,7 +660,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.yaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
         ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
         ax.set_xlim(-2.5, 2.5)
-
         ax.set_ylim(0, 1.3)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
@@ -529,7 +668,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
         ax.grid(which='major', alpha=0.9, linestyle='dotted')
         leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=16 )
-
         mpt = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV" + "\n {}".format(taggerName)
         ax.annotate( mpt, xy=(0.05, 0.85), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
@@ -605,7 +743,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax2.yaxis.set_ticks_position('right')
         ax2.tick_params('y', which='both', colors='red')
         ax2.semilogy()
-
         ax2.set_ylim(0.0002, 1)
         
         ax.set_xlabel(r'$\mathrm{p_T\ [GeV]}$', ha='right', x=1.0)
@@ -622,7 +759,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.yaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
         ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
         ax.set_xlim(300, 2000)
-
         ax.set_ylim(0, 1.3)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
@@ -922,7 +1058,9 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 truths = [""]*len(labels)
                 truths[i] = lab
                 overlay_distribution(frame, savedir=savedir, feature=feature , truths=truths, app_weight=False)
-
+    
+        make_DDT(frame, 5, siglab='QCD', sculp_label='Hbb', savedir=savedir, taggerName=taggerName)
+    
     print("Finished Plotting")
 
 def main(args):
@@ -991,8 +1129,8 @@ def main(args):
         f.savefig('%s/Loss_%s.pdf'%(outdir,indir.replace('/','')))
         plt.close(f)
 
-    plot_loss(args.indir,args.outdir, taggerName="Interaction network", eraText=r'2016 (13 TeV)')
-    plot_loss(args.indecdir,args.outdir, taggerName="Interaction network mass decor.", eraText=r'2016 (13 TeV)')
+    #plot_loss(args.indir,args.outdir, taggerName="Interaction network", eraText=r'2016 (13 TeV)')
+    #plot_loss(args.indecdir,args.outdir, taggerName="Interaction network mass decor.", eraText=r'2016 (13 TeV)')
     
     make_plots(evalDir,
                [df_in,df_in_dec,df,df_dec],
