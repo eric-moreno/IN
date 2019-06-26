@@ -447,11 +447,11 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         
         weight = ctdf['truth'+'Hbb'].values
         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
-                        histtype='step',label='{}\% FPR Cut Hbb'.format(FPR_cut))
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
        
         weight_uncut = tdf['truth'+'Hbb'].values
         ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
-                        histtype='step',label='No FPR Cut Hbb')
+                        histtype='step',label='No FPR Cut QCD')
                                 
                                 
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
