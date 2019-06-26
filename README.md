@@ -32,7 +32,7 @@ Determine the parameters needed for the IN. For example:
 Would be run using :
 
 ```
-python IN_dataGenerator.py IN_training 0 --De 20, --Do 24 --hidden 60 
+python IN_dataGenerator.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 
 
@@ -41,7 +41,7 @@ as the IN you are trying to adversarially train. For adversarial training you mu
 additional parameters (preloaded IN directory, lambda weight, and mass bins): 
 
 ```
-python IN_dataGenerator_adv.py IN_training 0 --De 20, --Do 24 --hidden 60 --preload IN_training --lambda 10, --nbins 40  
+python IN_dataGenerator_adv.py IN_training 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10, --nbins 40  
 ```
 
 Evaluation 
@@ -51,7 +51,7 @@ Change the save path for the test dataset under save_path in IN_eval.py. Next ca
 location: 
 
 ```
-python IN_eval.py IN_training 0 --De 20, --Do 24 --hidden 60 
+python IN_eval.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 
 To make various plots (ROC, pT dep, PU dep, sculpting, distributions, etc.) run make_good_plots.py giving both the regular IN and 
@@ -69,7 +69,7 @@ It works with both mass-sculpting and mass-decorrelated models. Change the save 
 To use ONNX, you must have an already trained model and must provide IN_onnx.py with the parameters of this trained model: 
 
 ```
-python IN_onnx.py IN_training 0 --De 20, --Do 24 --hidden 60 
+python IN_onnx.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 
 This will save the ONNX model in the directory where the trained IN is located. 
