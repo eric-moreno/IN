@@ -328,7 +328,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         plt.close(f)
         #sys.exit()
 
-    def make_DDT(tdf, FPR_cut, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
+    def make_DDT(tdf, FPR_cut=5, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
         
         print('Setting DDT cut to {}%'.format(FPR_cut))
         if siglab == sculp_label: return 
@@ -379,7 +379,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
        
         # Determining cuts for each bin
         big_cuts = []
-        bins = np.linspace(40,200,9)
+        bins = np.linspace(40,200,NBINS+1)
         for i in range(NBINS): 
             cuts = {}
             for wp in [FPR_cut/100]: # % mistag rate
@@ -387,7 +387,16 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 cuts[str(wp)] = thresholds[i][idx] # threshold for tagger corresponding to ~0.05% mistag rate
             big_cuts.append(cuts)
    
+        # Create plot of FPR thresholds at different mass bins for smooth interpolation 
         f, ax = plt.subplots(figsize=(10,10))
+        small_bins = np.linspace(40, 200, NBINS)
+        small_cuts = []
+        for i in big_cuts: 
+            small_cuts.append(i['0.05'])
+        ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
+        ax.set_ylabel(r'Threshold Cut ({})'.format('QCD'), ha='right', y=1.0)
+        ax.plot(small_bins, small_cuts)
+        f.savefig(os.path.join(savedir,'cut_mass_plot' + '.png'), dpi=400)
         
         
         # Plot QCD distribution at 5% cut
@@ -452,8 +461,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         weight_uncut = tdf['truth'+'Hbb'].values
         ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
                         histtype='step',label='No FPR Cut QCD')
-                                
-                                
+                                                    
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
         ax.set_ylabel(r'Normalized scale ({})'.format('Hbb'), ha='right', y=1.0)
         import matplotlib.ticker as plticker
@@ -1035,7 +1043,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         savedir = os.path.join(outputDir,savedir)
         make_dirs(savedir)
         frame = cut(frame)
- 
+        
         for label in labels:
             for label2 in labels:
                 if label == label2: continue
@@ -1058,7 +1066,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 truths = [""]*len(labels)
                 truths[i] = lab
                 overlay_distribution(frame, savedir=savedir, feature=feature , truths=truths, app_weight=False)
-    
+        
         make_DDT(frame, 5, siglab='QCD', sculp_label='Hbb', savedir=savedir, taggerName=taggerName)
     
     print("Finished Plotting")
