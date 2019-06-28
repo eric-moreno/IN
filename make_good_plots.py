@@ -371,7 +371,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         thresholds = []
   
         for i in range(NBINS):
-            truth, predict, db = roc_input(tdf.reindex(binned_events[i]), signal=['QCD'], include = ['QCD', 'Hbb'])
+            truth, predict, db = roc_input(tdf.reindex(binned_events[i]), signal=['Hbb'], include = ['Hbb', 'QCD'])
             fpr, tpr, threshold = roc_curve(truth, predict)
             fprs.append(fpr)
             tprs.append(tpr)
@@ -404,7 +404,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ctdf = ctdf.head(0)
         for i in range(NBINS): 
             for wp, cut in reversed(sorted(big_cuts[i].items())):
-                ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'QCD'].values > cut])
+                ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'Hbb'].values > cut])
         
         weight = ctdf['truth'+'QCD'].values
         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
