@@ -72,4 +72,4 @@ To use ONNX, you must have an already trained model and must provide IN_onnx.py 
 python IN_onnx.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 
-This will save the ONNX model in the directory where the trained IN is located. 
+This will save the ONNX model in the directory where the trained IN is located, which can then be easily converted into most ML frameworks. 
