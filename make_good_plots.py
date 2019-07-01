@@ -93,7 +93,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                             ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
             ROCtext.close()
             print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
-            
+         
         ax.set_xlim(0,1)
         ax.set_ylim(0.001,1)
         if len(sig) == 1 and len(sig[0]) == 3 and sig[0][0] in ["H", "Z", "g"]:
@@ -136,7 +136,64 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             f.savefig(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
             f.savefig(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
         plt.close(f)
-
+    
+    def plot_rocs_with_DDT(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname="", DDT_results = [[],[]]):
+        f, ax = plt.subplots(figsize=(10, 10))
+        for frame, name, sig, bkg in zip(dfs, names, sigs, bkgs):
+            truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
+            fpr, tpr, threshold = roc_curve(truth, predict)
+            
+            ax.plot(tpr, fpr, lw=2.5, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
+            ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
+            for ind in range(len(tpr)):
+                            ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
+            ROCtext.close()
+            print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
+         
+        ax.plot(DDT_results[0], DDT_results[1], lw=2.5, label="{}, AUC = {:.1f}\%".format('Interaction network, DDT',auc(DDT_results[1],DDT_results[0])*100))
+                
+        ax.set_xlim(0,1)
+        ax.set_ylim(0.001,1)
+        if len(sig) == 1 and len(sig[0]) == 3 and sig[0][0] in ["H", "Z", "g"]:
+            xlab = '{} \\rightarrow {}'.format(sig[0][0], sig[0][-2]+'\\bar{'+sig[0][-1]+'}') 
+            ax.set_xlabel(r'Tagging efficiency ($\mathrm{}$)'.format('{'+xlab+'}'), ha='right', x=1.0)
+        else: 
+            xlab = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if l[0][0] in ["H", "Z", "g"] else l for l in sig ]
+            ax.set_xlabel(r'Tagging efficiency ($\mathrm{}$)'.format("{"+", ".join(xlab)+"}"), ha='right', x=1.0)
+        if len(bkg) == 1 and len(bkg[0]) == 3 and bkg[0][0] in ["H", "Z", "g"]:
+            ylab = '{} \\rightarrow {}'.format(bkg[0][0], bkg[0][-2]+'\\bar{'+bkg[0][-1]+'}') 
+            ax.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format('{'+ylab+'}'), ha='right', y=1.0)
+        else:
+            ylab = ['{} \\rightarrow {}'.format(l[0], l[-2]+'\\bar{'+l[-1]+'}') if l[0][0] in ["H", "Z", "g"] else l for l in bkg ]
+            ax.set_ylabel(r'Mistagging rate ($\mathrm{}$)'.format("{"+", ".join(ylab)+"}"), ha='right', y=1.0)
+        import matplotlib.ticker as plticker
+        ax.xaxis.set_major_locator(plticker.MultipleLocator(base=0.1))
+        ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=0.02))
+        ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12 )
+        ax.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('both')    
+        ax.semilogy()
+        ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
+        ax.grid(which='major', alpha=0.9, linestyle='dotted')
+        leg = ax.legend(borderpad=1, frameon=False, loc=2, fontsize=16,
+            title = ""+str(int(round((min(frame.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(frame.fj_pt)))))+" GeV" \
+                        + "\n "+str(int(round((min(frame.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(frame.fj_sdmass)))))+" GeV"
+                       )
+        leg._legend_box.align = "left"
+        ax.annotate(eraText, xy=(0.75, 1.1), fontname='Helvetica', ha='left',
+                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(0.01, 1.1), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.115, 1.1), fontsize=18, fontstyle='italic', ha='left',
+                    annotation_clip=False)
+        if norm:
+            f.savefig(os.path.join(savedir, "ROCNormComparison_withDDT_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
+            f.savefig(os.path.join(savedir, "ROCNormComparison_withDDT_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
+        else:
+            f.savefig(os.path.join(savedir, "ROCComparison_withDDT_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
+            f.savefig(os.path.join(savedir, "ROCComparison_withDDT_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
+        plt.close(f)
         
     def plot_jsd(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname=""):
 
@@ -327,8 +384,21 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
         plt.close(f)
         #sys.exit()
-
-    def make_DDT(tdf, FPR_cut=5, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
+    
+    
+    def make_TPR_DDT(tdf, FPR_cut=5, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
+        
+        
+        NBINS= 8 # number of bins for loss function
+        MMAX = 200. # max value
+        MMIN = 40. # min value
+        
+        
+        weight = tdf['truth'+'Hbb'].values
+        bins = np.linspace(40,200,NBINS+1)
+        values, bins, _ = plt.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+        correct = sum(values)
         
         print('Setting DDT cut to {}%'.format(FPR_cut))
         if siglab == sculp_label: return 
@@ -348,10 +418,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
             
         # Placing events in bins to detemine threshold for each individual bin
         binned_events = []
-        
-        NBINS= 8 # number of bins for loss function
-        MMAX = 200. # max value
-        MMIN = 40. # min value
         
         for nbin in range(NBINS): 
             binned_events.append([]) 
@@ -386,34 +452,123 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 idx, val = find_nearest(fprs[i], wp)
                 cuts[str(wp)] = thresholds[i][idx] # threshold for tagger corresponding to ~0.05% mistag rate
             big_cuts.append(cuts)
-   
-        # Create plot of FPR thresholds at different mass bins for smooth interpolation 
+       
+        
+        # Plot Hbb distribution with the same 5% QCD cut
         f, ax = plt.subplots(figsize=(10,10))
-        small_bins = np.linspace(40, 200, NBINS)
-        small_cuts = []
-        for i in big_cuts: 
-            small_cuts.append(i['0.05'])
-        ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
-        ax.set_ylabel(r'Threshold Cut ({})'.format('QCD'), ha='right', y=1.0)
-        ax.plot(small_bins, small_cuts)
-        f.savefig(os.path.join(savedir,'cut_mass_plot' + '.png'), dpi=400)
-        
-        
-        # Plot QCD distribution at 5% cut
         ctdf = tdf.copy()
         ctdf = ctdf.head(0)
         for i in range(NBINS): 
             for wp, cut in reversed(sorted(big_cuts[i].items())):
                 ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'Hbb'].values > cut])
         
+        weight = ctdf['truth'+'Hbb'].values
+        
+        values, bins, _ = plt.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+        
+        selected = sum(values) 
+        return(selected/correct)
+    
+    def make_DDT(tdf, FPR_cut=5, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
+        
+        NBINS= 20 # number of bins for loss function
+        MMAX = 200. # max value
+        MMIN = 40. # min value
+        
+        
+        weight = tdf['truth'+'Hbb'].values
+        bins = np.linspace(40,200,NBINS+1)
+        values, bins, _ = plt.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+        correct = sum(values)
+        
+        print('Setting DDT cut to {}%'.format(FPR_cut))
+        if siglab == sculp_label: return 
+        def find_nearest(array,value):
+            idx = (np.abs(array-value)).argmin()
+            return idx, array[idx]
+        
+        if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = siglab
+        if sculp_label[0] in ["H", "Z", "g"] and len(sculp_label) == 3:
+            legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
+            legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
+        else: legend_bkglab = sculp_label
+            
+        # Placing events in bins to detemine threshold for each individual bin
+        binned_events = []
+  
+        for nbin in range(NBINS): 
+            binned_events.append([]) 
+           
+        binWidth = (MMAX - MMIN) / NBINS
+        masses = tdf['fj_sdmass'].values
+        for event in range(len(tdf)):
+            if masses[event] < MMIN: 
+                binned_events[0].append(event)
+            elif masses[event] > MMAX: 
+                binned_events[-1].append(event)
+            else:
+                binned_events[int((masses[event]-MMIN)/binWidth)].append(tdf.index[event])
+        
+        fprs = []
+        tprs = []
+        thresholds = []
+  
+        for i in range(NBINS):
+            truth, predict, db = roc_input(tdf.reindex(binned_events[i]), signal=['Hbb'], include = ['Hbb', 'QCD'])
+            fpr, tpr, threshold = roc_curve(truth, predict)
+            fprs.append(fpr)
+            tprs.append(tpr)
+            thresholds.append(threshold)
+       
+        # Determining cuts for each bin
+        big_cuts = []
+        bins = np.linspace(40,200,NBINS+1)
+        for i in range(NBINS): 
+            cuts = {}
+            for wp in [FPR_cut/100]: # % mistag rate
+                idx, val = find_nearest(fprs[i], wp)
+                cuts[str(wp)] = thresholds[i][idx] # threshold for tagger corresponding to ~0.05% mistag rate
+            big_cuts.append(cuts)
+        
+        # Create plot of FPR thresholds at different mass bins for smooth interpolation 
+        f, ax = plt.subplots(figsize=(10,10))
+        small_bins = np.linspace(40, 200, NBINS)
+        small_cuts = []
+        for i in big_cuts: 
+            small_cuts.append(i[str(FPR_cut/100)])
+        ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
+        ax.set_ylabel(r'Threshold Cut ({})'.format('QCD'), ha='right', y=1.0)
+        ax.plot(small_bins, small_cuts)
+        f.savefig(os.path.join(savedir,'cut_mass_plot' + '.png'), dpi=400)
+        
+        
+        f, ax = plt.subplots(figsize=(10,10))
+        # Plot QCD distribution at 5% cut
+        ctdf = tdf.copy()
+        ctdf = ctdf.head(0)
+        for i in range(NBINS): 
+            for wp, cut in reversed(sorted(big_cuts[i].items())):
+                ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'Hbb'].values > cut])
         weight = ctdf['truth'+'QCD'].values
+        
+        
+        
         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
                         histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
        
         weight_uncut = tdf['truth'+'QCD'].values
         ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
                         histtype='step',label='No FPR Cut QCD')
-                                
+        #values, bins, _ = plt.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=False,
+        #                histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+        #selected = sum(values)
+        #print('TPR IS: ' + str(selected/correct))                        
                                 
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
         ax.set_ylabel(r'Normalized scale ({})'.format('QCD'), ha='right', y=1.0)
@@ -455,6 +610,13 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 ctdf = ctdf.append(tdf.loc[binned_events[i]][tdf.loc[binned_events[i]]['predict'+'Hbb'].values > cut])
         
         weight = ctdf['truth'+'Hbb'].values
+        
+        values, bins, _ = plt.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight, lw=2, normed=False,
+                        histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
+        selected = sum(values)
+        print('TPR IS: ' + str(selected/correct))   
+        f, ax = plt.subplots(figsize=(10,10))
+        
         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/np.sum(weight), lw=2, normed=False,
                         histtype='step',label='{}\% FPR Cut QCD'.format(FPR_cut))
        
@@ -469,7 +631,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10))
         ax.yaxis.set_minor_locator(plticker.AutoMinorLocator(5))
         ax.set_xlim(40, 200)
-        ax.set_ylim(0, 0.45)
+        ax.set_ylim(0, 0.55)
         ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12)#, labelleft=False )
 
         ax.tick_params(direction='in', axis='both', which='minor' , length=6)
@@ -1016,7 +1178,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 f.savefig(os.path.join(savedir, 'dist_'+feature+'_'+"-".join(t for t in truths if len(t)>1)+'.png'), dpi=400)
             plt.close(f)                                
             print()
-
+    
     # plot BIG comparison ROC - hardcoded for now
     make_dirs(os.path.join(outputDir,'Plots'))
     plot_jsd(dfs=[cut(frame) for frame in dataframes],
@@ -1030,20 +1192,41 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
              names=taggerNames,
              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
              bkgs=[['QCD'],['QCD'],['QCD'],['QCD']])
-
+    
     plot_rocs(dfs=[cut(frame) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
               sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
               bkgs=[['QCD'],['QCD'],['QCD'],['QCD']])
-
-        
+    
+    FPR_range = np.logspace(-1,2, 100)
+    TPR_range = [] 
+    
     for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
         savedir = os.path.join(outputDir,savedir)
         make_dirs(savedir)
         frame = cut(frame)
         
+        for FPR in range(len(FPR_range)): 
+            
+            TPR_range.append(make_TPR_DDT(frame, FPR_range[FPR], siglab='QCD', sculp_label='Hbb', savedir=savedir, taggerName=taggerName))
+            FPR_range[FPR] = FPR_range[FPR]/100
+        
+        break
+    
+    plot_rocs_with_DDT(dfs=[cut(frame) for frame in dataframes],
+              savedir=os.path.join(outputDir,'Plots'),
+              names=taggerNames,
+              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
+              bkgs=[['QCD'],['QCD'],['QCD'],['QCD']], DDT_results = [TPR_range, FPR_range])
+   
+    for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
+        labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
+        savedir = os.path.join(outputDir,savedir)
+        make_dirs(savedir)
+        frame = cut(frame)
+   
         for label in labels:
             for label2 in labels:
                 if label == label2: continue
@@ -1066,9 +1249,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
                 truths = [""]*len(labels)
                 truths[i] = lab
                 overlay_distribution(frame, savedir=savedir, feature=feature , truths=truths, app_weight=False)
-        
-        make_DDT(frame, 5, siglab='QCD', sculp_label='Hbb', savedir=savedir, taggerName=taggerName)
-    
+                
     print("Finished Plotting")
 
 def main(args):
