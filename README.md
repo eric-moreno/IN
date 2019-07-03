@@ -41,7 +41,7 @@ as the IN you are trying to adversarially train. For adversarial training you mu
 additional parameters (preloaded IN directory, lambda weight, and mass bins): 
 
 ```
-python IN_dataGenerator_adv.py IN_training 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10, --nbins 40  
+python IN_dataGenerator_adv.py IN_training_adv 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10, --nbins 40  
 ```
 
 Alternatively, there is also an option to decorrelate using the DDT-technique. This is performed after training with a normal IN in the make_good_plots.py script. 
