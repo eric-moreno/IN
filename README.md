@@ -7,8 +7,7 @@ network natively runs using pytorch, but can be exported to other formats, as ex
 
 Setup
 ======================================================================================
-Clone all the files in the repository into a directory. Save data as a number of hdf5 files which can be loaded through the H5Data 
-class in data.py.
+Clone all the files in the repository into a directory. Save data as a number of hdf5 files which can be loaded through the H5Data class in [data.py](data.py).
 
 Training
 ======================================================================================
@@ -19,15 +18,10 @@ Change the test_path and train_path inside IN_dataGenerator.py to reflect the di
 Determine the parameters needed for the IN. For example: 
 
   - Output Directory = IN_training
-
   - Vertex-Vertex branch = 0 (turned off)
-
   - De = 20 
-
   - Do = 24
-
   - Hidden = 60
-
 
 Would be run using :
 
@@ -41,10 +35,10 @@ as the IN you are trying to adversarially train. For adversarial training you mu
 additional parameters (preloaded IN directory, lambda weight, and mass bins): 
 
 ```
-python IN_dataGenerator_adv.py IN_training_adv 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10, --nbins 40  
+python IN_dataGenerator_adv.py IN_training_adv 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10 --nbins 40  
 ```
 
-Alternatively, there is also an option to decorrelate using the DDT-technique. This is performed after training with a normal IN in the make_good_plots.py script. 
+Alternatively, there is also an option to decorrelate using the DDT-technique. This is performed after training with a normal IN in the [make_good_plots.py](make_good_plots.py) script. 
 
 Evaluation 
 =====================================================================================
@@ -62,12 +56,12 @@ mass decorrelated IN and an output directory:
 ```
 python make_good_plots.py IN_training IN_training_adv --outdir eval_IN_training 
 ```
-This script (make_good_plots.py) will also create a DDT-version of the IN that decorrelates based on a mass-dependent threshold cut. It is *usually* better decorrelated than an adversarial training. 
+This script ([make_good_plots.py](make_good_plots.py)) will also create a DDT-version of the IN that decorrelates based on a mass-dependent threshold cut. It is *usually* better decorrelated than an adversarial training. 
 
 Exporting to TensorFlow, MXNet, etc.
 ====================================================================================
 This export uses ONNX (https://github.com/onnx/onnx), an open ecosystem for interchangable ML models. 
-It works with both mass-sculpting and mass-decorrelated models. Change the save path for the test dataset under save_path in IN_onnx.py.
+It works with both mass-sculpting and mass-decorrelated models. Change the save path for the test dataset under save_path in [IN_onnx.py](IN_onnx.py).
 
 To use ONNX, you must have an already trained model and must provide IN_onnx.py with the parameters of this trained model: 
 
