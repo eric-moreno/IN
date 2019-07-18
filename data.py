@@ -63,13 +63,14 @@ class Data(object):
           batch_size: size of training batches
     """
 
-    def __init__(self, batch_size, cache=None):
+    def __init__(self, batch_size, cache=None, spectators=False):
         """Stores the batch size and the names of the data files to be read.
             Params:
               batch_size: batch size for training
         """
         self.batch_size = batch_size
         self.caching_directory = cache if cache else os.environ.get('GANINMEM','')
+        self.spectators = spectators
         self.fpl = None
 
     def set_caching_directory(self, cache):
@@ -114,22 +115,37 @@ class Data(object):
        """Yields batches of training data until none are left."""
        leftovers = None
        for cur_file_name in self.file_names:
-           cur_file_features, cur_file_labels = self.load_data(cur_file_name)
+           if self.spectators:
+               cur_file_features, cur_file_labels, cur_file_spectators = self.load_data(cur_file_name)
+           else:
+               cur_file_features, cur_file_labels = self.load_data(cur_file_name)
            # concatenate any leftover data from the previous file
            if leftovers is not None:
                cur_file_features = self.concat_data( leftovers[0], cur_file_features )
                cur_file_labels = self.concat_data( leftovers[1], cur_file_labels )
+               if self.spectators:
+                   cur_file_spectators = self.concat_data( leftovers[2], cur_file_spectators)                   
                leftovers = None
            num_in_file = self.get_num_samples( cur_file_features )
 
            for cur_pos in range(0, num_in_file, self.batch_size):
                next_pos = cur_pos + self.batch_size 
                if next_pos <= num_in_file:
-                   yield ( self.get_batch( cur_file_features, cur_pos, next_pos ),
-                           self.get_batch( cur_file_labels, cur_pos, next_pos ) )
+                   if self.spectators:
+                       yield ( self.get_batch( cur_file_features, cur_pos, next_pos ),
+                               self.get_batch( cur_file_labels, cur_pos, next_pos ),
+                               self.get_batch( cur_file_spectators, cur_pos, next_pos ) )
+                   else:
+                       yield ( self.get_batch( cur_file_features, cur_pos, next_pos ),
+                               self.get_batch( cur_file_labels, cur_pos, next_pos ) )
                else:
-                   leftovers = ( self.get_batch( cur_file_features, cur_pos, num_in_file ),
-                                 self.get_batch( cur_file_labels, cur_pos, num_in_file ) )
+                   if self.spectators:
+                       leftovers = ( self.get_batch( cur_file_features, cur_pos, num_in_file ),
+                                     self.get_batch( cur_file_labels, cur_pos, num_in_file ),
+                                     self.get_batch( cur_file_spectators, cur_pos, num_in_file) )
+                   else:
+                       leftovers = ( self.get_batch( cur_file_features, cur_pos, num_in_file ),
+                                     self.get_batch( cur_file_labels, cur_pos, num_in_file ) )
 
     def count_data(self):
         """Counts the number of data points across all files"""
@@ -177,17 +193,20 @@ class Data(object):
 class H5Data(Data):
     """Loads data stored in hdf5 files
         Attributes:
-          features_name, labels_name: names of the datasets containing the features
-          and labels, respectively
+          features_name, labels_name, spectators_name: names of the datasets containing the features, 
+          labels, and spectators respectively
     """
     def __init__(self, batch_size,
                  cache=None,
                  preloading=0,
-                 features_name='features', labels_name='labels'):
+                 features_name='features',
+                 labels_name='labels',
+                 spectators_name = None):
         """Initializes and stores names of feature and label datasets"""
-        super(H5Data, self).__init__(batch_size,cache)
+        super(H5Data, self).__init__(batch_size,cache,(spectators_name is not None))
         self.features_name = features_name
-        self.labels_name = labels_name
+        self.labels_name = labels_name        
+        self.spectators_name = spectators_name
         ## initialize the data-preloader
         self.fpl = None
         if preloading:
@@ -205,11 +224,16 @@ class H5Data(Data):
             h5_file = h5py.File( in_file_name, 'r' )
         X = self.load_hdf5_data( h5_file[self.features_name] )
         Y = self.load_hdf5_data( h5_file[self.labels_name] )
+        if self.spectators_name is not None:
+            Z = self.load_hdf5_data( h5_file[self.spectators_name] )
         if self.fpl:
             self.fpl.closeFile( in_file_name )
         else:
             h5_file.close()
-        return X,Y 
+        if self.spectators_name is not None:
+            return X,Y,Z
+        else:
+            return X,Y
 
     def load_hdf5_data(self, data):
         """Returns a numpy array or (possibly nested) list of numpy arrays 
@@ -230,7 +254,7 @@ class H5Data(Data):
             h5_file = h5py.File( in_file_name, 'r' )
             X = h5_file[self.features_name]
             if hasattr(X, 'keys'):
-                num_data += len(X[ X.keys()[0] ])
+                num_data += len(X[ list(X.keys())[0] ])
             else:
                 num_data += len(X)
             h5_file.close()
