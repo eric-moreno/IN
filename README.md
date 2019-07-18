@@ -1,40 +1,45 @@
-Interaction Network - A graph-based neural network for particle physics applications
+Interaction Network: a graph-based neural network for particle physics applications
 ======================================================================================
 
-This data format used in this package was produced from CMS Opendata (http://opendata-dev.web.cern.ch/record/12102) and converted 
-Ntuples using https://github.com/cms-opendata-analyses/HiggsToBBNtupleProducerTool. The interaction
-network natively runs using pytorch, but can be exported to other formats, as explained below.
+The data used in this package was produced from [CMS open simulated data](http://doi.org/10.7483/OPENDATA.CMS.JGJX.MS7Q) using [HiggsToBBNtupleProducerTool](https://github.com/cms-opendata-analyses/HiggsToBBNtupleProducerTool). The interaction network natively runs in PyTorch, but can be exported to other formats, as explained below.
 
 Setup
 ======================================================================================
-Clone all the files in the repository into a directory. Save data as a number of hdf5 files which can be loaded through the H5Data class in [data.py](data.py).
+Clone the repository and setup the libraries. Convert the data to h5 files which can be loaded through the H5Data class in [data.py](data.py) (TODO).
+
+```
+git clone https://github.com/eric-moreno/IN.git
+cd IN
+source install_miniconda.sh
+source install.sh
+source setup.sh # every time
+```
 
 Training
 ======================================================================================
 
-Change the test_path and train_path inside IN_dataGenerator.py to reflect the directories of the test and training datasets 
-(in hdf5 format). Change the file loading to reflect the naming scheme of your hdf5 files inside IN_dataGenerator.py
+Change the `test_path` and `train_path` in [IN_dataGenerator.py](IN_dataGenerator.py) to reflect the directories of the test and training datasets 
+(in converted h5 format). Change the file loading to reflect the naming scheme of your h5 files in [IN_dataGenerator.py](IN_dataGenerator.py).
 
 Determine the parameters needed for the IN. For example: 
 
-  - Output Directory = IN_training
-  - Vertex-Vertex branch = 0 (turned off)
+  - Output directory = IN_training
+  - Vertex-vertex branch = 0 (turned off)
   - De = 20 
   - Do = 24
   - Hidden = 60
 
-Would be run using :
+Would be run by doing:
 
-```
+```bash
 python IN_dataGenerator.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
-
 
 For adversarial training to decorrelate from soft-drop jet mass, you must have a full pretrained IN to preload with the same parameters
 as the IN you are trying to adversarially train. For adversarial training you must specify the previous parameters as well as some 
 additional parameters (preloaded IN directory, lambda weight, and mass bins): 
 
-```
+```bash
 python IN_dataGenerator_adv.py IN_training_adv 0 --De 20 --Do 24 --hidden 60 --preload IN_training --lambda 10 --nbins 40  
 ```
 
@@ -43,29 +48,34 @@ Alternatively, there is also an option to decorrelate using the DDT-technique. T
 Evaluation 
 =====================================================================================
 
-Change the save path for the test dataset under save_path in IN_eval.py. Next call IN_eval.py given the network parameters and save 
+Change the save path for the test dataset under `save_path` in IN_eval.py. Next call IN_eval.py given the network parameters and save 
 location: 
 
-```
+```bash
 python IN_eval.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 
-To make various plots (ROC, pT dep, PU dep, sculpting, distributions, etc.) run make_good_plots.py giving both the regular IN and 
-mass decorrelated IN and an output directory: 
+To make various plots (ROC, pT dep, PU dep, sculpting, distributions, etc.), run [make_good_plots.py](make_good_plots.py) giving both the regular IN and mass decorrelated IN and an output directory: 
 
-```
+```bash
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/output.pkl .
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/output_dec.pkl .
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training.tar.gz
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training_adv.tar.gz
+tar xvzf IN_training_adv.tar.gz 
+tar xvzf IN_training.tar.gz 
+rm IN_training_adv.tar.gz IN_training.tar.gz
 python make_good_plots.py IN_training IN_training_adv --outdir eval_IN_training 
 ```
 This script ([make_good_plots.py](make_good_plots.py)) will also create a DDT-version of the IN that decorrelates based on a mass-dependent threshold cut. It is *usually* better decorrelated than an adversarial training. 
 
 Exporting to TensorFlow, MXNet, etc.
 ====================================================================================
-This export uses ONNX (https://github.com/onnx/onnx), an open ecosystem for interchangable ML models. 
-It works with both mass-sculpting and mass-decorrelated models. Change the save path for the test dataset under save_path in [IN_onnx.py](IN_onnx.py).
+This export uses [ONNX](https://github.com/onnx/onnx), an open ecosystem for interchangable ML models. It works with both mass-sculpting and mass-decorrelated models. Change the save path for the test dataset under `save_path` in [IN_onnx.py](IN_onnx.py).
 
-To use ONNX, you must have an already trained model and must provide IN_onnx.py with the parameters of this trained model: 
+To use ONNX, you must have an already trained model and must provide [IN_onnx.py](IN_onnx.py) with the parameters of this trained model: 
 
-```
+```bash
 python IN_onnx.py IN_training 0 --De 20 --Do 24 --hidden 60 
 ```
 

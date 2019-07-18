@@ -8,7 +8,10 @@ os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 
 batch_size = 100000
 counter = 0
-save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
+if os.path.isdir('/bigdata/shared/BumbleB'):
+    save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+elif os.path.isdir('/eos/user/w/woodson/IN'):
+    save_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 
 train_0_arrays = []
 train_1_arrays = []

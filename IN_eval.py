@@ -11,14 +11,21 @@ from matplotlib import rcParams
 from matplotlib import rc
 import pandas as pd
 import sys
-import setGPU
+import imp
+try:
+    imp.find_module('setGPU')
+    import setGPU
+except ImportError:
+    pass    
 import argparse
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
-save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
-
+if os.path.isdir('/bigdata/shared/BumbleB'):
+    save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+elif os.path.isdir('/eos/user/w/woodson/IN'):
+    save_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 spectators = ['fj_pt',
               'fj_eta',
               'fj_sdmass',

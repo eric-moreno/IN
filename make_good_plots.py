@@ -11,8 +11,12 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib import rc
-import setGPU
-
+import imp
+try:
+    imp.find_module('setGPU')
+    import setGPU
+except ImportError:
+    pass    
 from sklearn.metrics import roc_curve, auc, accuracy_score
 import scipy
 import h5py
@@ -333,7 +337,6 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
         plt.close(f)
-        sys.exit()
 
 
     def sculpting(tdf, siglab="Hcc", sculp_label='Light', savedir="", taggerName=""):
@@ -927,6 +930,7 @@ def make_plots(outputDir, dataframes, savedirs=["Plots"], taggerNames=["IN"], er
 
 def main(args):
     evalDir = args.outdir 
+    os.system('mkdir -p %s'%evalDir)
 
     df = pd.read_pickle('output.pkl')
     df_dec = pd.read_pickle('output_dec.pkl')
