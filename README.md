@@ -18,8 +18,7 @@ source setup.sh # every time
 Training
 ======================================================================================
 
-Change the `test_path` and `train_path` in [IN_dataGenerator.py](IN_dataGenerator.py) to reflect the directories of the test and training datasets 
-(in converted h5 format). Change the file loading to reflect the naming scheme of your h5 files in [IN_dataGenerator.py](IN_dataGenerator.py).
+Change the `test_path` and `train_path` in [IN_dataGenerator.py](IN_dataGenerator.py) to reflect the directories of the test and training datasets (in converted h5 format). Change the file loading to reflect the naming scheme of your h5 files in [IN_dataGenerator.py](IN_dataGenerator.py).
 
 Determine the parameters needed for the IN. For example: 
 
@@ -60,8 +59,8 @@ To make various plots (ROC, pT dep, PU dep, sculpting, distributions, etc.), run
 ```bash
 xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/output.pkl .
 xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/output_dec.pkl .
-xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training.tar.gz
-xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training_adv.tar.gz
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training.tar.gz .
+xrdcp root://eosuser.cern.ch//eos/user/w/woodson/IN/IN_training_adv.tar.gz .
 tar xvzf IN_training_adv.tar.gz 
 tar xvzf IN_training.tar.gz 
 rm IN_training_adv.tar.gz IN_training.tar.gz
