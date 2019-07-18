@@ -7,7 +7,12 @@ import os
 import numpy as np
 import pandas as pd
 import util
-import setGPU
+import imp
+try:
+    imp.find_module('setGPU')
+    import setGPU
+except ImportError:
+    pass    
 import glob
 import sys
 import tqdm
@@ -16,8 +21,13 @@ import argparse
 #sys.path.insert(0, '/nfshome/jduarte/DL4Jets/mpi_learn/mpi_learn/train')
 
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
-test_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
-train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
+if os.path.isdir('/bigdata/shared/BumbleB'):
+    test_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+    train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
+elif os.path.isdir('/eos/user/w/woodson/IN'):
+    test_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+    train_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
+
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value

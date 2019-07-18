@@ -1,6 +1,11 @@
 import numpy as np
 import torch
-import setGPU
+import imp
+try:
+    imp.find_module('setGPU')
+    import setGPU
+except ImportError:
+    pass    
 import argparse
 import onnx
 import warnings
@@ -10,7 +15,10 @@ import os
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
-save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+if os.path.isdir('/bigdata/shared/BumbleB'):
+    save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+elif os.path.isdir('/eos/user/w/woodson/IN'):
+    save_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 
 params_2 = ['track_ptrel',     
           'track_erel',     
