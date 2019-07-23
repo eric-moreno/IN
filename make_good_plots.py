@@ -1545,10 +1545,6 @@ def main(args):
     prediction_in_dec = np.load('%s/prediction_new.npy'%(args.indecdir))
     df_in_dec['predictHbb'] = prediction_in_dec[:,1]
     df_in_dec['predictQCD'] = prediction_in_dec[:,0]
-    df_in_reweight = df.copy(deep=True)
-    prediction_in_reweight = np.load('%s/prediction_new.npy'%(args.indecdirQCDreweight))
-    df_in_reweight['predictHbb'] = prediction_in_reweight[:,1]
-    df_in_reweight['predictQCD'] = prediction_in_reweight[:,0]
     
     
     # to add ntrueInt
@@ -1608,7 +1604,7 @@ def main(args):
     
     make_plots(evalDir,
                [df_in, df,df_dec,df_in_dec],
-               savedirs=["Plots/IN","Plots/IN_QCDreweight", "Plots/DDB","Plots/DDB_dec", "Plots/IN_adversarial"],
+               savedirs=["Plots/IN", "Plots/DDB","Plots/DDB_dec", "Plots/IN_adversarial"],
                taggerNames=["Interaction network", "Deep double-b", "Deep double-b mass decor.", "Interaction network adversarial"],
                eraText=r'2016 (13 TeV)')
 
