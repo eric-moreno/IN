@@ -258,7 +258,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         cuts = aux_scale*model.predict(data)
         return cuts
     
-     def fit_quantile_reg(tdf, FPR_cut=[], savename=""): 
+    def fit_quantile_reg(tdf, FPR_cut=[], savename=""):
             
         from sklearn.ensemble import GradientBoostingRegressor
 
@@ -349,11 +349,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 eb_plot = []
                 big_cuts = np.load('DDT_TPRcuts_sdmass.npy')
                 
-                print(big_cuts)
-                
-                for wp,marker in zip([30,50,90,95],['v','^','s','o']): # % signal eff.
+                for wp,marker in zip([30.,50.,90.,95.],['v','^','s','o']): # % signal eff.
                     idx, val = find_nearest(tpr, wp/100)
-                    print(big_cuts.item().get(str(wp)))
                     mask_pass = (frame['predict'+sig[0]] > big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
                     mask_fail = (frame['predict'+sig[0]] < big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
                     
@@ -658,7 +655,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         big_cuts = np.load('DDT_TPRcuts_sdmass.npy')
         print(TPR_cut)
         
-        cuts = big_cuts.item().get(u+str(round(TPR_cut, 5)))
+        cuts = big_cuts.item().get(str(round(TPR_cut, 5)))
         print(cuts)
         ctdf = ctdf.append(tdf.loc[tdf['predict'+'QCD'].values < cuts])
         
@@ -800,13 +797,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         f, ax = plt.subplots(figsize=(10,10))
         weight_uncut = tdf['truth'+'Hbb'].values.astype(float)
         
-        
+        '''
         h_list=[]
         n, binEdges = np.histogram(tdf.loc[tdf['truth'+'QCD'] == 1]['fj_sdmass'].values, bins=bins)
         h_list.append(create_TH1D(tdf['fj_sdmass'].values, name='No tagging applied', title=None, binning=bins, weights=weight_uncut/np.sum(weight_uncut), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (Hbb)'], opt='', color = 1))
         h_list[-1].SetMarkerStyle(20)
         h_list[-1].SetMarkerColor(1)
         h_list[-1].SetStats(0)
+        '''
         
         for FPR in range(len(FPR_cut)): 
             weight = dataframes_cut[FPR]['truth'+'Hbb'].values.astype(float)
@@ -819,18 +817,17 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     color='C'+str(FPR)
                    )
 
-            n, binEdges = np.histogram(dataframes_cut[FPR].loc[dataframes_cut[FPR]['truth'+'Hbb'] == 1]['fj_sdmass'].values, bins=bins)
-            h_list.append(n)
-            h_list.append(create_TH1D(dataframes_cut[FPR]['fj_sdmass'].values, name='{}% mistagging rate'.format(FPR_cut[FPR]), title=None, binning=bins, weights=weight/np.sum(weight), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (Hbb)'], opt='', color = colorcode[FPR]))
-            h_list[-1].SetStats(0)
-            err = np.sqrt(n)
-            bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
+            #n, binEdges = np.histogram(dataframes_cut[FPR].loc[dataframes_cut[FPR]['truth'+'Hbb'] == 1]['fj_sdmass'].values, bins=bins)
+            #h_list.append(n)
+            #h_list.append(create_TH1D(dataframes_cut[FPR]['fj_sdmass'].values, name='{}% mistagging rate'.format(FPR_cut[FPR]), title=None, binning=bins, weights=weight/np.sum(weight), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (Hbb)'], opt='', color = colorcode[FPR]))
+            #h_list[-1].SetStats(0)
+            #err = np.sqrt(n)
+            #bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
             #plt.errorbar(bincenters, n/np.sum(n), yerr=err/np.sum(n), fmt='none', ecolor='C'+str(FPR))
        
-        plot = make_ratio_plot(h_list, title = "", label = "", in_tags = None, ratio_bounds = [0.8, 1.2], draw_opt = 'E1')
-        plot.SaveAs(os.path.join(savedir,'Ratio_Plot_SDmass_Hbb.pdf'))
+        #plot = make_ratio_plot(h_list, title = "", label = "", in_tags = None, ratio_bounds = [0.8, 1.2], draw_opt = 'E1')
+        #plot.SaveAs(os.path.join(savedir,'Ratio_Plot_SDmass_Hbb.pdf'))
                   
-        weight_uncut = tdf['truth'+'Hbb'].values
         ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
                         histtype='step',label='No tagging applied')
                                                     
@@ -1516,7 +1513,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                      siglab="Hbb", 
                      savedir=os.path.join(outputDir,"Plots/IN_DDT"), 
                      taggerName="Interaction Network, DDT")
-            sys.exit()
             
         savedir = os.path.join(outputDir,savedir)
         make_dirs(savedir)
