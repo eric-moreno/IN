@@ -12,6 +12,7 @@ from matplotlib import rc
 import pandas as pd
 import sys
 import imp
+import os
 try:
     imp.find_module('setGPU')
     import setGPU
