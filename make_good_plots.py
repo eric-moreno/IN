@@ -19,7 +19,7 @@ import argparse
 import glob
 import matplotlib.lines as mlines
 from sklearn.ensemble import GradientBoostingRegressor
-from histo_utilities import create_TH1D, make_ratio_plot
+#from histo_utilities import create_TH1D, make_ratio_plot
 
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
@@ -721,12 +721,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         
         
         n, binEdges = np.histogram(tdf.loc[tdf['truth'+'QCD'] == 1]['fj_sdmass'].values, bins=bins)
+        '''
         h_list.append(create_TH1D(tdf['fj_sdmass'].values, name='No tagging applied', title=None, binning=bins, weights=weight_uncut/np.sum(weight_uncut), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (QCD)'], opt='', color = 1))
         h_list[-1].SetMarkerStyle(20)
         h_list[-1].SetMarkerColor(1)
         h_list[-1].SetStats(0)
         h_list[-1].SetLineWidth(2)
-        
+        '''
+       
         colorcode = [2, 5, 6, 8, 9]
         for FPR in range(len(FPR_cut)):
             weight = dataframes_cut[FPR]['truth'+'QCD'].values.astype(float)
@@ -738,17 +740,20 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     label='{}\% mistagging rate'.format(FPR_cut[FPR]),
                     color='C'+str(FPR)
                    )
-            n, binEdges = np.histogram(dataframes_cut[FPR].loc[dataframes_cut[FPR]['truth'+'QCD'] == 1]['fj_sdmass'].values, bins=bins)
-            h_list.append(create_TH1D(dataframes_cut[FPR]['fj_sdmass'].values, name='{}% mistagging rate'.format(FPR_cut[FPR]), title=None, binning=bins, weights=weight/np.sum(weight), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (QCD)'], opt='', color = colorcode[FPR]))
-            h_list[-1].SetStats(0)
-            h_list[-1].SetLineWidth(2)
-            err = np.sqrt(n)
-            bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
+            
+            #n, binEdges = np.histogram(dataframes_cut[FPR].loc[dataframes_cut[FPR]['truth'+'QCD'] == 1]['fj_sdmass'].values, bins=bins)
+            
+            #h_list.append(create_TH1D(dataframes_cut[FPR]['fj_sdmass'].values, name='{}% mistagging rate'.format(FPR_cut[FPR]), title=None, binning=bins, weights=weight/np.sum(weight), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (QCD)'], opt='', color = colorcode[FPR]))
+            #h_list[-1].SetStats(0)
+            #h_list[-1].SetLineWidth(2)
+            
+            #err = np.sqrt(n)
+            #bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
             #plt.errorbar(bincenters, n/np.sum(n), yerr=err/np.sum(n), fmt='none', ecolor='C'+str(FPR))
-  
-        plot = make_ratio_plot(h_list, title = "", label = "", in_tags = None, ratio_bounds = [0.6, 1.4], draw_opt = 'E1')
+            
+        #plot = make_ratio_plot(h_list, title = "", label = "", in_tags = None, ratio_bounds = [0.6, 1.4], draw_opt = 'E1')
         
-        plot.SaveAs(os.path.join(savedir,'Ratio_Plot_SDmass_QCD.pdf'))
+        #plot.SaveAs(os.path.join(savedir,'Ratio_Plot_SDmass_QCD.pdf'))
         
         ax.hist(tdf['fj_sdmass'].values, bins=bins, weights = weight_uncut/np.sum(weight_uncut), lw=2, normed=False,
                         histtype='step',label='No tagging applied')
