@@ -1544,20 +1544,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 def main(args):
     evalDir = args.outdir 
 
-    df = pd.read_pickle('output.pkl')
-    df_dec = pd.read_pickle('output_dec.pkl')
+    df = pd.read_pickle('output_test.pkl')
     df_in = df.copy(deep=True)
     prediction_in = np.load('%s/prediction_new.npy'%(args.indir))
     df_in['predictHbb'] = prediction_in[:,1]
     df_in['predictQCD'] = prediction_in[:,0]
-    df_in_adv = df.copy(deep=True)
-    prediction_in_adv = np.load('%s/prediction_new.npy'%(args.inadvdir))
-    df_in_adv['predictHbb'] = prediction_in_adv[:,1]
-    df_in_adv['predictQCD'] = prediction_in_adv[:,0]
-    df_in_rwgt = df.copy(deep=True)
-    prediction_in_rwgt = np.load('%s/prediction_new.npy'%(args.inrwgtdir))
-    df_in_rwgt['predictHbb'] = prediction_in_rwgt[:,1]
-    df_in_rwgt['predictQCD'] = prediction_in_rwgt[:,0]
     
     
     df_train = pd.read_pickle('output_train.pkl')
@@ -1624,9 +1615,9 @@ def main(args):
     #plot_loss(args.indecdir,args.outdir, taggerName="Interaction network mass decor.", eraText=r'2016 (13 TeV)')
     
     make_plots(evalDir,
-               [df_in, df_in_adv, df_in_rwgt, df,df_dec], df_in_train,
-               savedirs=["Plots/IN", "Plots/IN_adversarial", "Plots/IN_rwgt", "Plots/DDB","Plots/DDB_dec"],
-               taggerNames=["Interaction network", "Interaction network adversarial", "Interaction network QCD reweight", "Deep double-b", "Deep double-b mass decor."],
+               [df_in], df_in_train,
+               savedirs=["Plots/IN"],
+               taggerNames=["Interaction network"],
                eraText=r'2016 (13 TeV)')
 
     #make_plots(evalDir,
@@ -1644,8 +1635,6 @@ if __name__ == "__main__":
     
     # Required positional arguments
     parser.add_argument("indir", help="IN results dir")
-    parser.add_argument("inadvdir", help="IN adversarial results dir")
-    parser.add_argument("inrwgtdir", help="IN QCD reweight results dir")
     parser.add_argument("-o", "--outdir", action='store', dest='outdir', default = 'IN_Run2', help="outdir")
 
     args = parser.parse_args()
