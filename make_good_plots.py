@@ -19,7 +19,7 @@ import argparse
 import glob
 import matplotlib.lines as mlines
 from sklearn.ensemble import GradientBoostingRegressor
-from histo_utilities import create_TH1D, make_ratio_plot
+#from histo_utilities import create_TH1D, make_ratio_plot
 
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
@@ -272,6 +272,172 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
         np.save(savename+'.npy', big_cuts)
     
+    def plot_jsd_limit(frame=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname=""):
+
+        from scipy.spatial import distance
+        
+        ndatapoints = 300
+        nBbins = 10
+        f, ax = plt.subplots(figsize=(10, 10))
+        temp_frame = frame
+        
+        mmin = -5
+        mmax = 5
+        nbins = 20
+        frame = np.random.normal(size=188924) 
+        spec_a = np.digitize(frame, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
+        spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
+        spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
+        spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+        nA = spec_ohe_a.shape[0]
+        #plt.yscale('log')
+        ax.loglog()
+        
+        for nA, x, color, color_fill in zip(np.logspace(np.log10(len(frame)) - 2, np.log10(len(frame)), 3), np.logspace(0, 2, 3),  ['orange', 'pink', 'purple'], ['bisque', 'lightpink', 'violet']): 
+            
+            big_kld = []
+            spec_a = np.digitize(frame, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
+            spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
+            spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
+            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+            
+            
+            spec_ohe_a = spec_ohe_a[:int(nA)]                         
+            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+            nA = spec_ohe_a.shape[0]
+      
+            for nB in np.logspace(np.log10(x), np.log10(nA), nBbins):    
+                kld = []
+                for i in range(ndatapoints): 
+                    index = np.random.randint(0, int(nA), int(nB))
+                    spec_ohe_b = spec_ohe_a[index] 
+                    spec_ohe_b_sum = np.sum(spec_ohe_b,axis=0)/spec_ohe_b.shape[0]
+                    kld.append(1./scipy.stats.entropy(spec_ohe_a_sum, spec_ohe_b_sum, base=2))      
+                big_kld.append(kld)
+                print(nB)
+            
+            sums = np.array([np.mean(i) for i in big_kld])
+            std = [np.std(i) for i in big_kld]
+            
+            
+            print(sums)
+            
+            
+            print(np.logspace(np.log10(x), np.log10(nA), nBbins)/float(nA))
+            
+            plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/float(nA), sums, color = color, label = "Normal dist., nA = " + str(nA), linestyle='--')
+            plt.fill_between(np.logspace(np.log10(x), np.log10(nA), nBbins)/float(nA), sums-std, sums+std, color = color_fill, alpha=0.50)
+        
+        
+        mmin = 40
+        mmax = 200
+        nbins = 8
+
+        
+        big_kld = []
+        
+        frame = temp_frame
+        
+        frame = frame.loc[frame['truth'+bkgs[0][0]] == 1]
+        nA = len(frame)
+        mass_a = frame.loc[frame['truth'+bkgs[0][0]] == 1]['fj_sdmass'].values
+        spec_a = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
+        spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
+        spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
+        spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+        nA = spec_ohe_a.shape[0]
+        
+        for nA, x,  color, color_fill in zip(np.logspace(np.log10(len(frame)) - 2, np.log10(len(frame)), 3), np.logspace(0, 2, 3), ['red', 'blue', 'green'], ['salmon', 'lightblue', 'lightgreen']): 
+            
+            big_kld = []
+            
+            mass_a = frame.loc[frame['truth'+bkgs[0][0]] == 1]['fj_sdmass'].values
+            spec_a = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
+            spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
+            spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
+            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+            
+            
+            spec_ohe_a = spec_ohe_a[:int(nA)]                         
+            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+            nA = spec_ohe_a.shape[0]
+      
+            for nB in np.logspace(np.log10(x), np.log10(nA), nBbins):    
+                kld = []
+                for i in range(ndatapoints): 
+                    index = np.random.randint(0, int(nA), int(nB))
+                    spec_ohe_b = spec_ohe_a[index] 
+                    spec_ohe_b_sum = np.sum(spec_ohe_b,axis=0)/spec_ohe_b.shape[0]
+                    kld.append(1./scipy.stats.entropy(spec_ohe_a_sum, spec_ohe_b_sum, base=2))      
+                big_kld.append(kld)
+                print(nB)
+
+            print(np.logspace(x, nA, nBbins)/float(nA))    
+                
+            sums = np.array([np.mean(i) for i in big_kld])
+            std = [np.std(i) for i in big_kld]
+           
+            plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums, color = color, label = "Mass dist., nA = " + str(nA))
+            plt.fill_between(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums-std, sums+std, color = color_fill, alpha=0.50)
+        
+        
+        ax.set_xlim(0.00052932,1)
+        ax.set_ylim(1e-2,70000)
+        ax.set_xlabel(r'nB/nA',ha='right', x=1.0)
+        ax.set_ylabel(r'1 / $D_\mathrm{JS}$',ha='right', y=1.0)
+        
+        import matplotlib.ticker as plticker
+        
+        #ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12 )
+        #ax.tick_params(direction='in', axis='both', which='minor' , length=6)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('both')    
+        ax.grid(which='minor', alpha=0.5, linestyle='dotted')
+        ax.grid(which='major', alpha=0.9, linestyle='dotted')
+        
+        leg = ax.legend(borderpad=1, frameon=False, loc='upper left', fontsize=16)
+       
+       
+        leg._legend_box.align = "right"
+        
+        ax.annotate(eraText, xy=(1e3, 1.1e7), fontname='Helvetica', ha='left',
+                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$\mathbf{CMS}$', xy=(1.1, 1.1e7), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
+        ax.annotate('$Simulation\ Open\ Data$', xy=(3, 1.1e7), fontsize=18, fontstyle='italic', ha='left',
+                    annotation_clip=False)
+        
+        f.savefig(os.path.join(savedir, "JSD_limit" + ".pdf"), dpi=400)
+        f.savefig(os.path.join(savedir, "JSD_limit" + ".png"), dpi=400)
+        plt.close(f)     
+           
+    def get_jsd_limit(frame=[], nB=1000):   
+        
+        ndatapoints = 300
+        
+        mmin = 40
+        mmax = 200
+        nbins = 8
+        
+        frame = frame.loc[frame['truth'+'QCD'] == 1]
+        nA = len(frame)
+        mass_a = frame.loc[frame['truth'+'QCD'] == 1]['fj_sdmass'].values
+        spec_a = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
+        spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
+        spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
+        spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
+        nA = spec_ohe_a.shape[0]
+         
+        kld = []
+        for i in range(ndatapoints): 
+            index = np.random.randint(0, int(nA), int(nB))
+            spec_ohe_b = spec_ohe_a[index] 
+            spec_ohe_b_sum = np.sum(spec_ohe_b,axis=0)/spec_ohe_b.shape[0]
+            kld.append(1./scipy.stats.entropy(spec_ohe_b_sum, spec_ohe_a_sum, base=2))      
+        
+        return(np.mean(kld), np.std(kld))
+        
+        
     def plot_jsd(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname=""):
 
         prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -315,8 +481,16 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     mask_pass = (frame['predict'+sig[0]] > cuts[str(wp)]) & frame['truth'+bkg[0]]
                     mask_fail = (frame['predict'+sig[0]] < cuts[str(wp)]) & frame['truth'+bkg[0]]
                     mass = frame['fj_sdmass'].values
+                    
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
+                    
+                    frac_pass=float(len(mass_pass))/(len(mass_pass) + len(mass_fail))
+                    frac_fail=float(len(mass_fail))/(len(mass_pass) + len(mass_fail))
+                    mass_pass = mass_pass[:int(0.3*len(mass_pass))]
+                    mass_fail = mass_fail[:int(0.3*len(mass_fail))]
+
+
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
                     spec_fail = np.digitize(mass_fail, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -328,7 +502,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     spec_ohe_fail[np.arange(spec_fail.shape[0]),spec_fail] = 1
                     spec_ohe_fail_sum = np.sum(spec_ohe_fail,axis=0)/spec_ohe_fail.shape[0]
                     M = 0.5*spec_ohe_pass_sum+0.5*spec_ohe_fail_sum
-
+                    
                     kld_pass = scipy.stats.entropy(spec_ohe_pass_sum,M,base=2)
                     kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
                     jsd = 0.5*kld_pass+0.5*kld_fail
@@ -357,6 +531,13 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
+
+                    frac_pass=float(len(mass_pass))/(len(mass_pass) + len(mass_fail))
+                    frac_fail=float(len(mass_fail))/(len(mass_pass) + len(mass_fail))
+                    mass_pass = mass_pass[:int(0.3*len(mass_pass))]
+                    mass_fail = mass_fail[:int(0.3*len(mass_fail))]
+
+                
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
                     spec_fail = np.digitize(mass_fail, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -376,11 +557,17 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     eb_plot.append(1/make_FPR_DDT(frame,int(wp), siglab='QCD', sculp_label='fj_sdmass', taggerName=name))
                     jsd_plot.append(1/jsd)
                     ax.plot([1/make_FPR_DDT(frame,int(wp), siglab='QCD', sculp_label='fj_sdmass', taggerName=name)],[1/jsd],marker=marker,markersize=12,color=color)
+                    
+             
                    
             ax.plot(eb_plot,jsd_plot,linestyle='-',label=name,color=color)
-            
+        
+        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
+        min_jsd = get_jsd_limit(dfs[0], nB=0.3*size)[0]
+        ax.plot([1, 1e4], [min_jsd, min_jsd], linestyle='--', label='Statistical Limit JSD')
+
         ax.set_xlim(1,1e4)
-        ax.set_ylim(1,1e7)
+        ax.set_ylim(1,2e7)
         ax.set_xlabel(r'Background rejection (QCD) 1 / $\varepsilon_\mathrm{bkg}$',ha='right', x=1.0)
         ax.set_ylabel(r'Mass decorrelation 1 / $D_\mathrm{JS}$',ha='right', y=1.0)
         
@@ -410,11 +597,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         leg2 = ax.legend(handles=[circle, square, utriangle, dtriangle],fontsize=16,frameon=False,borderpad=1,loc='upper right')
         leg2._legend_box.align = "right"
         plt.gca().add_artist(leg2)
-        ax.annotate(eraText, xy=(1e3, 1.1e7), fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(1e3, 2.1e7), fontname='Helvetica', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$\mathbf{CMS}$', xy=(1.1, 1.1e7), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+        ax.annotate('$\mathbf{CMS}$', xy=(1.1, 2.1e7), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$Simulation\ Open\ Data$', xy=(3, 1.1e7), fontsize=18, fontstyle='italic', ha='left',
+        ax.annotate('$Simulation\ Open\ Data$', xy=(3, 2.1e7), fontsize=18, fontstyle='italic', ha='left',
                     annotation_clip=False)
         
         f.savefig(os.path.join(savedir, "JSD_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
@@ -456,8 +643,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 cuts = {}
                 jsd_plot = []
                 es_plot = []
-                for wp,marker in zip([0.005,0.01,0.05,0.1],['v','^','s','o']): # % bkg rej.
-                    
+                #for wp,marker in zip([0.005,0.01,0.05,0.1],['v','^','s','o']): # % bkg rej.
+                for wp,marker in zip([0.01,0.05,0.1],['^','s','o']): # % bkg rej.    
                     idx, val = find_nearest(fpr, wp)
                     cuts[str(wp)] = threshold[idx] # threshold 
                     mask_pass = (frame['predict'+sig[0]] > cuts[str(wp)]) & frame['truth'+bkg[0]]
@@ -465,6 +652,16 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
+                    
+                    print(mask_pass)
+               
+                    
+                    frac_pass=float(len(mass_pass))/(len(mass_pass) + len(mass_fail))
+                    frac_fail=float(len(mass_fail))/(len(mass_pass) + len(mass_fail))
+                    mass_pass = mass_pass[:int(0.01*len(mass_pass))]
+                    mass_fail = mass_fail[:int(0.01*len(mass_fail))]
+
+                   
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
                     spec_fail = np.digitize(mass_fail, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -476,7 +673,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     spec_ohe_fail[np.arange(spec_fail.shape[0]),spec_fail] = 1
                     spec_ohe_fail_sum = np.sum(spec_ohe_fail,axis=0)/spec_ohe_fail.shape[0]
                     M = 0.5*spec_ohe_pass_sum+0.5*spec_ohe_fail_sum
-
+                    
                     kld_pass = scipy.stats.entropy(spec_ohe_pass_sum,M,base=2)
                     kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
                     jsd = 0.5*kld_pass+0.5*kld_fail
@@ -498,15 +695,23 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 es_plot = []
                 big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
                     
-                for wp,marker in zip([0.5,1.,5.,10.],['v','^','s','o']): # % bkg rej.
+                #for wp,marker in zip([0.5,1.,5.,10.],['v','^','s','o']): # % bkg rej.
+                for wp,marker in zip([1.,5.,10.],['^','s','o']): # % bkg rej.
                     idx, val = find_nearest(fpr, wp/100)
 
                     mask_pass = (frame['predict'+sig[0]] > big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
                     mask_fail = (frame['predict'+sig[0]] < big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
-                   
+                    print(mask_pass)
+                    print(mask_fail)
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
+                    
+                    frac_pass=float(len(mass_pass))/(len(mass_pass) + len(mass_fail))
+                    frac_fail=float(len(mass_fail))/(len(mass_pass) + len(mass_fail))
+                    mass_pass = mass_pass[:int(0.01*len(mass_pass))]
+                    mass_fail = mass_fail[:int(0.01*len(mass_fail))]
+                    
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
                     spec_fail = np.digitize(mass_fail, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -529,9 +734,12 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     
                     
                 ax.plot(es_plot,jsd_plot,linestyle='-',label=name,color=color)
-            
+        
+        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
+        min_jsd = get_jsd_limit(dfs[0], nB=0.01*size)[0]
+        ax.plot([0, 1], [min_jsd, min_jsd], linestyle='--', label='Statistical Limit JSD')
         ax.set_xlim(0,1)
-        ax.set_ylim(1,1e5)
+        ax.set_ylim(1,5e4)
         ax.set_xlabel(r'Tagging efficiency ($\mathrm{H \rightarrow b\bar{b}}$) $\varepsilon_\mathrm{sig}$',ha='right', x=1.0)
         ax.set_ylabel(r'Mass decorrelation 1 / $D_\mathrm{JS}$',ha='right', y=1.0)
         
@@ -555,17 +763,18 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                                                              markersize=12, label=r'$\varepsilon_\mathrm{bkg}$ = 5\%%')
         utriangle = mlines.Line2D([], [], color='gray', marker='^', linestyle='None',
                                                                   markersize=12, label=r'$\varepsilon_\mathrm{bkg}$ = 1\%%')
-        dtriangle = mlines.Line2D([], [], color='gray', marker='v', linestyle='None',
-                                                                  markersize=12, label=r'$\varepsilon_\mathrm{bkg}$ = 0.5\%%')
+        #dtriangle = mlines.Line2D([], [], color='gray', marker='v', linestyle='None',
+        #                                                          markersize=12, label=r'$\varepsilon_\mathrm{bkg}$ = 0.5\%%')
         plt.gca().add_artist(leg)
-        leg2 = ax.legend(handles=[circle, square, utriangle, dtriangle],fontsize=16,frameon=False,borderpad=1,loc='center left')
+        #leg2 = ax.legend(handles=[circle, square, utriangle, dtriangle],fontsize=16,frameon=False,borderpad=1,loc='center left')
+        leg2 = ax.legend(handles=[circle, square, utriangle],fontsize=16,frameon=False,borderpad=1,loc='upper right')
         leg2._legend_box.align = "left"
         plt.gca().add_artist(leg2)
-        ax.annotate(eraText, xy=(0.75, 1.1e5), fontname='Helvetica', ha='left',
+        ax.annotate(eraText, xy=(0.75, 5.1e4),fontname='Helvetica', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$\mathbf{CMS}$', xy=(0, 1.1e5), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
+        ax.annotate('$\mathbf{CMS}$', xy=(0, 5.1e4), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
                     bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 1.1e5), fontsize=18, fontstyle='italic', ha='left',
+        ax.annotate('$Simulation\ Open\ Data$', xy=(0.105, 5.1e4), fontsize=18, fontstyle='italic', ha='left',
                     annotation_clip=False)
         
         f.savefig(os.path.join(savedir, "JSD_sig_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".pdf"), dpi=400)
@@ -1438,6 +1647,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
     # plot BIG comparison ROC - hardcoded for now
     make_dirs(os.path.join(outputDir,'Plots'))
     
+    #plot_jsd_limit(frame=[cut(cutrho(frame)) for frame in dataframes][0], savedir=os.path.join(outputDir,'Plots'), names = "IN")
+    
     plot_jsd(dfs=[cut(cutrho(frame)) for frame in dataframes],
              savedir=os.path.join(outputDir,'Plots'),
              names=taggerNames,
@@ -1450,7 +1661,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
              names=taggerNames,
              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
              bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
-    
+    sys.exit()
+
     plot_rocs(dfs=[cut(frame) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
