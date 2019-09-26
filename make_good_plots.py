@@ -397,7 +397,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             
             plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, myExpFunc(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, *popt))
             plt.fill_between(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums-std, sums+std, color = color_fill, alpha=0.50)
-        sys.exit()
+       
         
         ax.set_xlim(0.00052932,1)
         ax.set_ylim(1e-2,70000)
@@ -2220,13 +2220,9 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
     sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='QCD', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
     
     
-    sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='Hbb', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
-    sys.exit()
-   
-    
+    sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='Hbb', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)  
     multiple_pu_dep([cut(cutrho(frame)) for frame in dataframes], taggerNames, sig_label='Hbb', bkg_label='QCD', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
-    sys.exit()
-    
+
     tdf_train = cut(tdf_train)
     for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
