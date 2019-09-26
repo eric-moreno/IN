@@ -2161,7 +2161,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
     
     # plot BIG comparison ROC - hardcoded for now
     make_dirs(os.path.join(outputDir,'Plots'))
-    
+    '''
     plot_jsd(dfs=[cut(cutrho(frame)) for frame in dataframes],
              savedir=os.path.join(outputDir,'Plots'),
              names=taggerNames,
@@ -2173,7 +2173,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
              names=taggerNames,
              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
              bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
-   
+    '''
     plot_rocs(dfs=[cut(frame) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
