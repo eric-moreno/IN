@@ -3,6 +3,8 @@ Interaction Network: a graph-based neural network for particle physics applicati
 
 The data used in this package was produced from [CMS open simulated data](http://doi.org/10.7483/OPENDATA.CMS.JGJX.MS7Q) using [HiggsToBBNtupleProducerTool](https://github.com/cms-opendata-analyses/HiggsToBBNtupleProducerTool). The interaction network natively runs in PyTorch, but can be exported to other formats, as explained below.
 
+E. Moreno et al., Interaction networks for the identification of boosted Higgs to bb decays, [arXiv:1909.12285](https://arxiv.org/abs/1909.12285) [hep-ex]
+
 Setup
 ======================================================================================
 Clone the repository and setup the libraries. Convert the data to h5 files which can be loaded through the H5Data class in [data.py](data.py) (TODO).
