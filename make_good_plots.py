@@ -264,7 +264,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             
         from sklearn.ensemble import GradientBoostingRegressor
 
-        print('Setting DDT cut to {}%'.format(FPR_cut))
+        print('Setting DDT cut to {}%'.tipformat(FPR_cut))
         big_cuts = {}
         for FPR in range(len(FPR_cut)):
             
@@ -2252,7 +2252,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         for label in labels:
             for label2 in labels:
                 if label == label2: continue        
-                multiple_pu_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
+                #multiple_pu_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
                 plot_rocs(dfs=[frame], savedir=savedir, names=[taggerName], 
                           sigs=[[label]], 
                           bkgs=[[label2]])
