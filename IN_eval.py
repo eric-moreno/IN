@@ -19,7 +19,7 @@ try:
 except ImportError:
     pass    
 import argparse
-
+ 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
