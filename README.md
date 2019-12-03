@@ -31,7 +31,7 @@ Determine the parameters needed for the IN. For example:
   - Do = 24
   - Hidden = 60
 
-Would be run by doing:
+Would be executed by running:
 
 ```bash
 python IN_dataGenerator.py IN_training 1 0 --De 20 --Do 24 --hidden 60 
