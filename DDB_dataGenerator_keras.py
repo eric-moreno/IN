@@ -110,18 +110,21 @@ def main(args):
 
     from ddb import model_DeepDoubleXReference
     keras_model = model_DeepDoubleXReference(inputs = [Input(shape=(N,len(params))),Input(shape=(N_sv,len(params_sv)))],
-                                             num_classes = n_targets)
+                                             num_classes = n_targets, scale_hidden = 2, 
+                                             hlf_input = None, datasets = ['cpf', 'sv'])
     
     keras_model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
 
-    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
+    keras_model.summary()
+
+    early_stopping = EarlyStopping(monitor='val_loss', patience=20)
     model_checkpoint = ModelCheckpoint('%s/keras_model_best.h5'%outdir, monitor='val_loss', save_best_only=True)
     callbacks = [early_stopping, model_checkpoint]
     keras_model.fit_generator(data_train.inf_generate_data_keras(),
                               validation_data = data_val.inf_generate_data_keras(),
-                              epochs=100, 
-                              steps_per_epoch=n_train/batch_size, 
-                              validation_steps=n_val/batch_size, 
+                              epochs=200, 
+                              steps_per_epoch=np.ceil(n_train/batch_size), 
+                              validation_steps=np.ceil(n_val/batch_size), 
                               callbacks = callbacks)
     
 

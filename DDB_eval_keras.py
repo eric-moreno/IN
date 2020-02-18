@@ -204,8 +204,12 @@ def main(args):
     prediction = np.array([])
     from ddb import model_DeepDoubleXReference
     keras_model = model_DeepDoubleXReference(inputs = [Input(shape=(N,len(params))),Input(shape=(N_sv,len(params_sv)))],
-                                             num_classes = n_targets)
+                                             num_classes = n_targets, scale_hidden = 2,
+                                             hlf_input = None, datasets = ['cpf', 'sv'])
+
     keras_model.load_weights('%s/keras_model_best.h5'%outdir)
+
+    keras_model.summary()
 
     for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
         out_test = keras_model.predict([test[j:j+batch_size],test_sv[j:j+batch_size]])
