@@ -1,24 +1,16 @@
 import numpy as np
 import torch
-import imp
-try:
-    imp.find_module('setGPU')
-    import setGPU
-except ImportError:
-    pass    
+import setGPU
 import argparse
 import onnx
 import warnings
-from onnx_tf.backend import prepare
+#from onnx_tf.backend import prepare
 import os
     
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
-if os.path.isdir('/bigdata/shared/BumbleB'):
-    save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
-elif os.path.isdir('/eos/user/w/woodson/IN'):
-    save_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 
 params_2 = ['track_ptrel',     
           'track_erel',     
@@ -81,10 +73,21 @@ def main(args):
     params_sv = params_3
     label = 'new'
     from gnn import GraphNet
-    gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
-                   vv_branch=int(args.vv_branch),
-                   De=args.De,
-                   Do=args.Do)
+    from gnn import GraphNetnoSV
+    
+    if args.sv_branch: 
+        gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+                       vv_branch=int(args.vv_branch),
+                       De=args.De,
+                       Do=args.Do)
+    
+    else:
+        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+                           sv_branch=int(args.sv_branch),
+                           vv_branch=int(args.vv_branch),
+                           De=args.De,
+                           Do=args.Do)
+    
     gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(args.outdir,label)))
     
     batch_size = 1
@@ -93,13 +96,20 @@ def main(args):
     #dummy_input_1 = torch.randn(32, 30, 60, device='cuda')
     #dummy_input_2 = torch.randn(32, 14, 5, device='cuda')
 
-    out_test = gnn(dummy_input_1, dummy_input_2)
-
-    input_names = ['input_cpf', 'input_sv']
-    output_names = ['output1']
-
-    torch.onnx.export(gnn, (dummy_input_1, dummy_input_2), "%s/gnn.onnx"%args.outdir, verbose=True,
-                      input_names = input_names, output_names = output_names)
+    if args.sv_branch: 
+        out_test = gnn(dummy_input_1, dummy_input_2)
+        input_names = ['input_cpf', 'input_sv']
+        output_names = ['output1']
+        torch.onnx.export(gnn, (dummy_input_1, dummy_input_2), "%s/gnn.onnx"%args.outdir, verbose=True,
+                          input_names = input_names, output_names = output_names)
+    
+    else: 
+        out_test = gnn(dummy_input_1)
+        input_names = ['input_cpf']
+        output_names = ['output1']
+        torch.onnx.export(gnn, (dummy_input_1), "%s/gnn.onnx"%args.outdir, verbose=True,
+                          input_names = input_names, output_names = output_names)
+    
 
     # Load the ONNX model
     model = onnx.load("%s/gnn.onnx"%args.outdir)
@@ -167,6 +177,7 @@ if __name__ == "__main__":
     
     # Required positional arguments
     parser.add_argument("outdir", help="Required output directory")
+    parser.add_argument("sv_branch", help="Required positional argument")
     parser.add_argument("vv_branch", help="Required positional argument")
     
     # Optional arguments

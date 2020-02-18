@@ -25,15 +25,16 @@ Change the `test_path` and `train_path` in [IN_dataGenerator.py](IN_dataGenerato
 Determine the parameters needed for the IN. For example: 
 
   - Output directory = IN_training
+  - Vertex-particle branch = 1 (turned on)
   - Vertex-vertex branch = 0 (turned off)
   - De = 20 
   - Do = 24
   - Hidden = 60
 
-Would be run by doing:
+Would be executed by running:
 
 ```bash
-python IN_dataGenerator.py IN_training 0 --De 20 --Do 24 --hidden 60 
+python IN_dataGenerator.py IN_training 1 0 --De 20 --Do 24 --hidden 60 
 ```
 
 For adversarial training to decorrelate from soft-drop jet mass, you must have a full pretrained IN to preload with the same parameters
@@ -53,7 +54,7 @@ Change the save path for the test dataset under `save_path` in IN_eval.py. Next 
 location: 
 
 ```bash
-python IN_eval.py IN_training 0 --De 20 --Do 24 --hidden 60 
+python IN_eval.py IN_training 1 0 --De 20 --Do 24 --hidden 60 
 ```
 
 To make various plots (ROC, pT dep, PU dep, sculpting, distributions, etc.), run [make_good_plots.py](make_good_plots.py) giving both the regular IN and mass decorrelated IN and an output directory: 
@@ -77,7 +78,7 @@ This export uses [ONNX](https://github.com/onnx/onnx), an open ecosystem for int
 To use ONNX, you must have an already trained model and must provide [IN_onnx.py](IN_onnx.py) with the parameters of this trained model: 
 
 ```bash
-python IN_onnx.py IN_training 0 --De 20 --Do 24 --hidden 60 
+python IN_onnx.py IN_training 1 0 --De 20 --Do 24 --hidden 60 
 ```
 
 This will save the ONNX model in the directory where the trained IN is located, which can then be easily converted into most ML frameworks. 

@@ -11,22 +11,14 @@ from matplotlib import rcParams
 from matplotlib import rc
 import pandas as pd
 import sys
-import imp
-import os
-try:
-    imp.find_module('setGPU')
-    import setGPU
-except ImportError:
-    pass    
+import setGPU
 import argparse
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
-if os.path.isdir('/bigdata/shared/BumbleB'):
-    save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
-elif os.path.isdir('/eos/user/w/woodson/IN'):
-    save_path = '/eos/user/w/woodson/IN/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+
 spectators = ['fj_pt',
               'fj_eta',
               'fj_sdmass',
@@ -135,7 +127,7 @@ def main(args):
     target_test_arrays = []
     
     for test_file in sorted(glob.glob(save_path + 'test_*_features_2.npy')):
-        test_2_arrays.append(np.load(test_file))
+        test_2_arrays.append(np.load(test_file))  
     test_2 = np.concatenate(test_2_arrays)
 
     for test_file in sorted(glob.glob(save_path + 'test_*_features_3.npy')):
@@ -179,14 +171,13 @@ def main(args):
     test_3 = test_3 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
     test_spec = test_spec [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
     target_test = target_test [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef  ]
-
-
+    
     print(test_2.shape)
     print(test_3.shape)
     print(target_test.shape)
     print(test_spec.shape)
     print(target_test.shape)
-
+  
     #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
     test = test_2
     params = params_2
@@ -195,34 +186,56 @@ def main(args):
 
     outdir = args.outdir
     vv_branch = args.vv_branch
+    sv_branch = args.sv_branch
+    
     label = 'new'
 
     prediction = np.array([])
     IN_out = np.array([])
     batch_size = 128
     torch.cuda.empty_cache()
+    
+    from gnn import GraphNetnoSV
     from gnn import GraphNet
-
-    gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+    
+    if sv_branch: 
+        gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
                    vv_branch=int(vv_branch),
                    De=args.De,
                    Do=args.Do)
+    else: 
+        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+                       sv_branch=int(sv_branch),
+                       vv_branch=int(vv_branch),
+                       De=args.De,
+                       Do=args.Do)
+    
     gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(outdir,label)))
 
     softmax = torch.nn.Softmax(dim=1)
-    for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
-        out_test = softmax(gnn(torch.from_numpy(test[j:j + batch_size]).cuda(), torch.from_numpy(test_sv[j:j + batch_size]).cuda()))
-        out_test = out_test.cpu().data.numpy()
-        if j==0:
-            prediction = out_test
-        else:
-            prediction = np.concatenate((prediction, out_test),axis=0)        
-        del out_test
+    
+    if sv_branch: 
+        for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
+            out_test = softmax(gnn(torch.from_numpy(test[j:j + batch_size]).cuda(), torch.from_numpy(test_sv[j:j + batch_size]).cuda()))
+            out_test = out_test.cpu().data.numpy()
+            if j==0:
+                prediction = out_test
+            else:
+                prediction = np.concatenate((prediction, out_test),axis=0)        
+            del out_test
 
+    else: 
+        for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
+            out_test = softmax(gnn(torch.from_numpy(test[j:j + batch_size]).cuda()))
+            out_test = out_test.cpu().data.numpy()
+            if j==0:
+                prediction = out_test
+            else:
+                prediction = np.concatenate((prediction, out_test),axis=0)        
+            del out_test
+            
     np.save('%s/truth_%s.npy'%(outdir,label),prediction)
     np.save('%s/prediction_%s.npy'%(outdir,label),prediction)
-    print(prediction)
-    print(target_test)
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
@@ -230,6 +243,7 @@ if __name__ == "__main__":
     
     # Required positional arguments
     parser.add_argument("outdir", help="Required output directory")
+    parser.add_argument("sv_branch", help="Required positional argument")
     parser.add_argument("vv_branch", help="Required positional argument")
     
     # Optional arguments

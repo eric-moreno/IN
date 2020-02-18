@@ -170,9 +170,15 @@ def main(args):
             trainingv = (torch.FloatTensor(training)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
-            
             optimizer.zero_grad()
             out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+            
+            #Input training dataset 
+            if sv_branch: 
+                out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+            else: 
+                out = gnn(trainingv.cuda())
+                
             l = loss(out, targetv.cuda())
             loss_training.append(l.item())
             l.backward()
@@ -189,7 +195,12 @@ def main(args):
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
             
-            out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+            #Input validation dataset 
+            if sv_branch: 
+                out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+            else: 
+                out = gnn(trainingv.cuda())
+                
             lst.append(softmax(out).cpu().data.numpy())
             l_val = loss(out, targetv.cuda())
             loss_val.append(l_val.item())
