@@ -24,8 +24,21 @@ MMAX = 200. # max value
 MMIN = 40. # min value
 
 N = 60 # number of charged particles
+N_neu = 100 # number of neutral particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
+
+params_1 = ['pfcand_ptrel',
+          'pfcand_erel',
+          'pfcand_phirel',
+          'pfcand_etarel',
+          'pfcand_deltaR',
+          'pfcand_puppiw',
+          'pfcand_drminsv',
+          'pfcand_drsubjet1',
+          'pfcand_drsubjet2',
+          'pfcand_hcalFrac'
+         ]
 
 params_2 = ['track_ptrel',     
           'track_erel',     
@@ -75,10 +88,19 @@ params_3 = ['sv_ptrel',
           'sv_costhetasvpv'
          ]
 
+
+
+'''
+#Deep double-b features 
+params_2 = params_2[22:]
+params_3 = params_2[11:13]
+'''
+
 def main(args):
     """ Main entry point of the app """
     
     #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
+    params_neu = params_1
     params = params_2
     params_sv = params_3
     
@@ -114,8 +136,10 @@ def main(args):
     print("val data:", n_val)
     print("train data:", n_train)
 
+    # Three implementations of IN with GraphNet being default
     from gnn import GraphNetnoSV
     from gnn import GraphNet
+    from gnn import GraphNetNeutral
     
     if sv_branch: 
         gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
@@ -126,7 +150,6 @@ def main(args):
         gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden,
                        De=args.De,
                        Do=args.Do)
-        
         
     # pre load best model
     #gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
@@ -163,14 +186,16 @@ def main(args):
         tic = time.perf_counter()
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_train.generate_data(),total=n_train/batch_size):
             training = sub_X[2]
+            #training_neu = sub_X[1]
             training_sv = sub_X[3]
             target = sub_Y[0]
             spec = sub_Z[0]
             trainingv = (torch.FloatTensor(training)).cuda()
+            #trainingv_neu = (torch.FloatTensor(training_neu)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
             optimizer.zero_grad()
-            out = gnn(trainingv.cuda(), trainingv_sv.cuda())
+            #out = gnn(trainingv.cuda(), trainingv_sv.cuda())
             
             #Input training dataset 
             if sv_branch: 
@@ -189,10 +214,12 @@ def main(args):
         tic = time.perf_counter()
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_val.generate_data(),total=n_val/batch_size):
             training = sub_X[2]
+            #training_neu = sub_X[1]
             training_sv = sub_X[3]
             target = sub_Y[0]
             spec = sub_Z[0]
             trainingv = (torch.FloatTensor(training)).cuda()
+            #trainingv_neu = (torch.FloatTensor(training_neu)).cuda()
             trainingv_sv = (torch.FloatTensor(training_sv)).cuda()
             targetv = (torch.from_numpy(np.argmax(target, axis = 1)).long()).cuda()
             
@@ -212,7 +239,6 @@ def main(args):
             del trainingv, trainingv_sv, targetv
         toc = time.perf_counter()
         print(f"Evaluation done in {toc - tic:0.4f} seconds")
-        
         l_val = np.mean(np.array(loss_val))
     
         predicted = np.concatenate(lst) #(torch.FloatTensor(np.concatenate(lst))).to(device)
@@ -228,7 +254,6 @@ def main(args):
             l_val_best = l_val
             torch.save(gnn.state_dict(), '%s/gnn_%s_best.pth'%(outdir,label))
             
-    
         print(val_targetv.shape, predicted.shape)
         print(val_targetv, predicted)
         acc_vals_validation[m] = accuracy_score(val_targetv[:,0],predicted[:,0]>0.5)
@@ -243,10 +268,10 @@ def main(args):
             break
         print()
 
-    acc_vals_validation = acc_vals_validation[:(final_epoch)]
-    loss_vals_training = loss_vals_training[:(final_epoch)]
-    loss_vals_validation = loss_vals_validation[:(final_epoch)]
-    loss_std_validation = loss_std_validation[:(final_epoch)]
+    acc_vals_validation = acc_vals_validation[:(final_epoch + 1)]
+    loss_vals_training = loss_vals_training[:(final_epoch + 1)]
+    loss_vals_validation = loss_vals_validation[:(final_epoch + 1)]
+    loss_std_validation = loss_std_validation[:(final_epoch + 1)]
     loss_std_training = loss_std_training[:(final_epoch)]
     np.save('%s/acc_vals_validation_%s.npy'%(outdir,label),acc_vals_validation)
     np.save('%s/loss_vals_training_%s.npy'%(outdir,label),loss_vals_training)

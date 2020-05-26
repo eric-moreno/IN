@@ -16,8 +16,10 @@ import argparse
 
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
+N_neu = 100
 n_targets = 2 # number of classes
-save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+save_path_test = '/storage/group/gpu/bigdata/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+save_path_train_val = '/storage/group/gpu/bigdata/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
 
 spectators = ['fj_pt',
               'fj_eta',
@@ -120,32 +122,63 @@ params_3 = ['sv_ptrel',
           'sv_costhetasvpv'
          ]
 
-def main(args):
+def main(args, save_path='', evaluating_test=True):
+    
+    test_1_arrays = []
     test_2_arrays = []
     test_3_arrays = []
     test_spec_arrays = []
     target_test_arrays = []
     
-    for test_file in sorted(glob.glob(save_path + 'test_*_features_2.npy')):
-        test_2_arrays.append(np.load(test_file))  
-    test_2 = np.concatenate(test_2_arrays)
+    if evaluating_test:
+        
+        for test_file in sorted(glob.glob(save_path + 'test_*_features_1.npy')):
+            test_1_arrays.append(np.load(test_file))  
+        test_1 = np.concatenate(test_1_arrays)
+        
+        for test_file in sorted(glob.glob(save_path + 'test_*_features_2.npy')):
+            test_2_arrays.append(np.load(test_file))  
+        test_2 = np.concatenate(test_2_arrays)
 
-    for test_file in sorted(glob.glob(save_path + 'test_*_features_3.npy')):
-        test_3_arrays.append(np.load(test_file))
-    test_3 = np.concatenate(test_3_arrays)
+        for test_file in sorted(glob.glob(save_path + 'test_*_features_3.npy')):
+            test_3_arrays.append(np.load(test_file))
+        test_3 = np.concatenate(test_3_arrays)
 
-    for test_file in sorted(glob.glob(save_path + 'test_*_spectators_0.npy')):
-        test_spec_arrays.append(np.load(test_file))
-    test_spec = np.concatenate(test_spec_arrays)
+        for test_file in sorted(glob.glob(save_path + 'test_*_spectators_0.npy')):
+            test_spec_arrays.append(np.load(test_file))
+        test_spec = np.concatenate(test_spec_arrays)
 
-    for test_file in sorted(glob.glob(save_path + 'test_*_truth_0.npy')):
-        target_test_arrays.append(np.load(test_file))
-    target_test = np.concatenate(target_test_arrays)
+        for test_file in sorted(glob.glob(save_path + 'test_*_truth_0.npy')):
+            target_test_arrays.append(np.load(test_file))
+        target_test = np.concatenate(target_test_arrays)
 
+    else: 
+        for test_file in sorted(glob.glob(save_path + 'train_val_*_features_1.npy')):
+            test_1_arrays.append(np.load(test_file))  
+        test_1 = np.concatenate(test_1_arrays)
+
+        for test_file in sorted(glob.glob(save_path + 'train_val_*_features_2.npy')):
+            test_2_arrays.append(np.load(test_file))  
+        test_2 = np.concatenate(test_2_arrays)
+
+        for test_file in sorted(glob.glob(save_path + 'train_val_*_features_3.npy')):
+            test_3_arrays.append(np.load(test_file))
+        test_3 = np.concatenate(test_3_arrays)
+
+        for test_file in sorted(glob.glob(save_path + 'train_val_*_spectators_0.npy')):
+            test_spec_arrays.append(np.load(test_file))
+        test_spec = np.concatenate(test_spec_arrays)
+
+        for test_file in sorted(glob.glob(save_path + 'train_val_*_truth_0.npy')):
+            target_test_arrays.append(np.load(test_file))
+        target_test = np.concatenate(target_test_arrays)
+    
+    del test_1_arrays
     del test_2_arrays
     del test_3_arrays
     del test_spec_arrays
     del target_test_arrays
+    test_1 = np.swapaxes(test_1, 1, 2)
     test_2 = np.swapaxes(test_2, 1, 2)
     test_3 = np.swapaxes(test_3, 1, 2)
     test_spec = np.swapaxes(test_spec, 1, 2)
@@ -167,6 +200,7 @@ def main(args):
     min_msd = -999 #40
     max_msd = 9999 #200
     
+    test_1 = test_1 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
     test_2 = test_2 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef]
     test_3 = test_3 [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
     test_spec = test_spec [ (fj_sdmass > min_msd) & (fj_sdmass < max_msd) & (fj_eta > min_eta) & (fj_eta < max_eta) & (fj_pt > min_pt) & (fj_pt < max_pt) & no_undef ]
@@ -179,7 +213,9 @@ def main(args):
     print(target_test.shape)
   
     #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
+    test_np = test_1
     test = test_2
+    params_neu = params_1
     params = params_2
     test_sv = test_3
     params_sv = params_3
@@ -192,11 +228,12 @@ def main(args):
 
     prediction = np.array([])
     IN_out = np.array([])
-    batch_size = 128
+    batch_size = 124
     torch.cuda.empty_cache()
     
     from gnn import GraphNetnoSV
     from gnn import GraphNet
+    from gnn import GraphNetNeutral 
     
     if sv_branch: 
         gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
@@ -209,6 +246,8 @@ def main(args):
                        vv_branch=int(vv_branch),
                        De=args.De,
                        Do=args.Do)
+    
+    
     
     gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(outdir,label)))
 
@@ -223,7 +262,7 @@ def main(args):
             else:
                 prediction = np.concatenate((prediction, out_test),axis=0)        
             del out_test
-
+            
     else: 
         for j in tqdm.tqdm(range(0, target_test.shape[0], batch_size)):
             out_test = softmax(gnn(torch.from_numpy(test[j:j + batch_size]).cuda()))
@@ -233,10 +272,16 @@ def main(args):
             else:
                 prediction = np.concatenate((prediction, out_test),axis=0)        
             del out_test
-            
-    np.save('%s/truth_%s.npy'%(outdir,label),prediction)
-    np.save('%s/prediction_%s.npy'%(outdir,label),prediction)
-
+    
+    if evaluating_test:
+        np.save('%s/truth_%s.npy'%(outdir,label),prediction)
+        np.save('%s/prediction_%s.npy'%(outdir,label),prediction)
+        
+    else: 
+        np.save('%s/truth_train_%s.npy'%(outdir,label),prediction)
+        np.save('%s/prediction_train_%s.npy'%(outdir,label),prediction)
+        
+        
 if __name__ == "__main__":
     """ This is executed when run from the command line """
     parser = argparse.ArgumentParser()
@@ -245,11 +290,11 @@ if __name__ == "__main__":
     parser.add_argument("outdir", help="Required output directory")
     parser.add_argument("sv_branch", help="Required positional argument")
     parser.add_argument("vv_branch", help="Required positional argument")
-    
     # Optional arguments
     parser.add_argument("--De", type=int, action='store', dest='De', default = 5, help="De")
     parser.add_argument("--Do", type=int, action='store', dest='Do', default = 6, help="Do")
     parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
 
     args = parser.parse_args()
-    main(args)
+    main(args, save_path_test, True)
+    main(args, save_path_train_val, False)

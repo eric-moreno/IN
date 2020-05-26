@@ -101,6 +101,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             return truth, np.divide(predict, prednorm), db
     
     def plot_rocs(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname=""):
+        
+        def find_nearest(array,value):
+            idx = (np.abs(array-value)).argmin()
+            return idx, array[idx]
+        
         f, ax = plt.subplots(figsize=(10, 10))
         for frame, name, sig, bkg in zip(dfs, names, sigs, bkgs):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
@@ -113,7 +118,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                             ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
             ROCtext.close()
             print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
-         
+            print("{}, Acc={}%".format(name, accuracy_score(truth,predict>0.5)*100), "Sig:", sig, "Bkg:", bkg)
+            #print(1/fpr[find_nearest(tpr, 0.3)[0]])
+            #print(1/fpr[find_nearest(tpr, 0.5)[0]])
+            #print(tpr[find_nearest(fpr, 0.01)[0]])
         ax.set_xlim(0,1)
         ax.set_ylim(0.001,1)
         if len(sig) == 1 and len(sig[0]) == 3 and sig[0][0] in ["H", "Z", "g"]:
@@ -159,15 +167,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
     
     def plot_rocs_with_DDT(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname="", DDT_results = [[],[]]):
         f, ax = plt.subplots(figsize=(10, 10))
-        colors = ['blue', 'navy', 'cornflowerblue', 'orange', 'orangered']
-        line_styles = ['-', '--', '-.' , ':', '--']
+        colors = ['blue', 'orange', 'green']
+        line_styles = ['-', '--', '-.' , '-', '--']
         line_widths = [2.5, 2.5, 2.5, 3, 2.5]
-        print(len(dfs))
         for frame, name, sig, bkg, color, style, width in zip(dfs, names, sigs, bkgs, colors, line_styles, line_widths):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
             fpr, tpr, threshold = roc_curve(truth, predict)
             
-            if color not in ['orange', 'orangered']:
+            if color not in ['navy', 'cornflowerblue', 'orange', 'green']:
                 
                 ax.plot(tpr, fpr, lw=width, color=color, linestyle = style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
                 ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
@@ -177,14 +184,13 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
          
-        ax.plot(DDT_results[0], DDT_results[1], lw=2.5, color='deepskyblue', linestyle = '-', label="{}, AUC = {:.1f}\%".format('Interaction network, DDT',auc(DDT_results[1],DDT_results[0])*100))
+        ax.plot(DDT_results[0][0], DDT_results[1], lw=2.5, color='deepskyblue', linestyle = ':', label="{}, AUC = {:.1f}\%".format('Interaction network, DDT',auc(DDT_results[1],DDT_results[0][0])*100))
         
         for frame, name, sig, bkg, color, style, width in zip(dfs, names, sigs, bkgs, colors, line_styles, line_widths):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
             fpr, tpr, threshold = roc_curve(truth, predict)
             
-            if color in ['orange', 'orangered']:
-                print(color)
+            if color in ['green']:
                 ax.plot(tpr, fpr, lw=width, color=color, linestyle=style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
                 ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
                 for ind in range(len(tpr)):
@@ -192,6 +198,20 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 ROCtext.close()
 
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
+        
+                ax.plot(DDT_results[0][2], DDT_results[1], lw=2.5, color='lime', linestyle = '-.', label="{}, AUC = {:.1f}\%".format('Deep double-b+, DDT',auc(DDT_results[1],DDT_results[0][2])*100))
+        
+            if color in ['orange']:
+                ax.plot(tpr, fpr, lw=width, color=color, linestyle=style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
+                ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
+                for ind in range(len(tpr)):
+                                ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
+                ROCtext.close()
+
+                print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
+        
+                
+                ax.plot(DDT_results[0][1], DDT_results[1], lw=2.5, color='orangered', linestyle = '--', label="{}, AUC = {:.1f}\%".format('Deep double-b, DDT',auc(DDT_results[1],DDT_results[0][1])*100))
         
         ax.set_xlim(0,1)
         ax.set_ylim(0.001,1)
@@ -236,13 +256,12 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             f.savefig(os.path.join(savedir, "ROCComparison_withDDT_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".png"), dpi=400)
         plt.close(f)
     
-    def quantile_regression_DDT(dfs, dfs_train, FPR_cut): 
+    def quantile_regression_DDT_FPR(dfs, dfs_train, FPR_cut): 
         
         print('Fitting Quantile Reg. of FPR = ' + str(FPR_cut))
-        data_train = [[mass] for mass, pT in zip(dfs_train.loc[dfs_train['truth'+'QCD'] == 1]['fj_sdmass'].values , dfs_train.loc[dfs_train['truth'+'QCD'] == 1]['fj_pt'].values)]
+        data_train = [[mass] for mass, pT in zip(dfs.loc[dfs['truth'+'QCD'] == 1]['fj_sdmass'].values , dfs.loc[dfs['truth'+'QCD'] == 1]['fj_pt'].values)]
         data = [[mass] for mass, pT in zip(dfs['fj_sdmass'].values , dfs['fj_pt'].values)]
-        
-        
+
         if FPR_cut > 10: 
             aux_scale = 0.1*float(FPR_cut)/3000.
         
@@ -250,13 +269,36 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             aux_scale = 0.1*float(FPR_cut)/100.
             
         model = GradientBoostingRegressor(loss='quantile', alpha= float(FPR_cut)/100, 
-                                          n_estimators=250, 
+                                          n_estimators=300, 
                                           min_samples_leaf=3, min_samples_split=3, 
                                           max_depth=5, 
-                                          validation_fraction=0.2, 
-                                          n_iter_no_change=5, tol=1e-4, 
+                                          validation_fraction=0.05, 
+                                          n_iter_no_change=5, tol=1e-3, 
                                           verbose=1)
-        model.fit(data_train, dfs_train.loc[dfs_train['truth'+'QCD'] == 1]['predict'+'Hbb'].values/aux_scale)
+        model.fit(data_train, dfs.loc[dfs['truth'+'QCD'] == 1]['predict'+'Hbb'].values/aux_scale)
+        cuts = aux_scale*model.predict(data)
+        return cuts
+    
+    def quantile_regression_DDT_TPR(dfs, dfs_train, TPR_cut): 
+        
+        print('Fitting Quantile Reg. of TPR = ' + str(TPR_cut))
+        data_train = [[mass] for mass, pT in zip(dfs.loc[dfs['truth'+'Hbb'] == 1]['fj_sdmass'].values , dfs.loc[dfs['truth'+'Hbb'] == 1]['fj_pt'].values)]
+        data = [[mass] for mass, pT in zip(dfs['fj_sdmass'].values , dfs['fj_pt'].values)]
+
+        if TPR_cut > 10: 
+            aux_scale = 0.1*float(TPR_cut)/3000.
+        
+        else: 
+            aux_scale = 0.1*float(TPR_cut)/100.
+            
+        model = GradientBoostingRegressor(loss='quantile', alpha= 1-float(TPR_cut)/100, 
+                                          n_estimators=300, 
+                                          min_samples_leaf=3, min_samples_split=3, 
+                                          max_depth=5, 
+                                          validation_fraction=0.1, 
+                                          n_iter_no_change=5, tol=1e-3, 
+                                          verbose=1)
+        model.fit(data_train, dfs.loc[dfs['truth'+'Hbb'] == 1]['predict'+'Hbb'].values/aux_scale)
         cuts = aux_scale*model.predict(data)
         return cuts
     
@@ -265,273 +307,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         from sklearn.ensemble import GradientBoostingRegressor
 
         print('Setting DDT cut to {}%'.format(FPR_cut))
-        big_cuts = {}
+        big_cuts = []
         for FPR in range(len(FPR_cut)):
             
             cuts = quantile_regression_DDT(tdf, tdf_train, FPR_cut[FPR])
-            big_cuts[str(round(FPR_cut[FPR], 5))] = cuts
+            big_cuts.append(cuts)
             
 
-        np.save(savename+'.npy', big_cuts)
-    
-    
-    
-    def plot_jsd_limit(frame=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname=""):
-
-        from scipy.spatial import distance
-        
-        ndatapoints = 300
-        nBbins = 10
-        f, ax = plt.subplots(figsize=(10, 10))
-        temp_frame = frame
-        
-        mmin = -5
-        mmax = 5
-        nbins = 20
-        frame = np.random.normal(size=188924) 
-        spec_a = np.digitize(frame, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-        spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
-        spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
-        spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-        nA = spec_ohe_a.shape[0]
-        #plt.yscale('log')
-        #ax.loglog()
-        
-        for nA, x, color, color_fill in zip(np.logspace(np.log10(len(frame)) - 2, np.log10(len(frame)), 3), np.logspace(0, 2, 3),  ['orange', 'pink', 'purple'], ['bisque', 'lightpink', 'violet']): 
-            
-            big_kld = []
-            spec_a = np.digitize(frame, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-            spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
-            spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
-            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-            
-            
-            spec_ohe_a = spec_ohe_a[:int(nA)]                         
-            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-            nA = spec_ohe_a.shape[0]
-      
-            for nB in np.logspace(np.log10(x), np.log10(nA), nBbins):    
-                kld = []
-                for i in range(ndatapoints): 
-                    index = np.random.randint(0, int(nA), int(nB))
-                    spec_ohe_b = spec_ohe_a[index] 
-                    spec_ohe_b_sum = np.sum(spec_ohe_b,axis=0)/spec_ohe_b.shape[0]
-                    kld.append(1./scipy.stats.entropy(spec_ohe_a_sum, spec_ohe_b_sum, base=2))      
-                big_kld.append(kld)
-                print(nB)
-            
-            sums = np.array([np.mean(i) for i in big_kld])
-            std = [np.std(i) for i in big_kld]
-            
-            from scipy.optimize import curve_fit
-            
-            def myExpFunc(x, a, b):
-                return a * np.power(x, b)
-            popt, pcov = curve_fit(myExpFunc, np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums[2])
-            
-            #plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, myExpFunc(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, *popt))
-            
-            print(popt)
-       
-            
-            plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/float(nA), sums, color = color, label = "Normal dist., nA = " + str(nA), linestyle='--')
-            plt.fill_between(np.logspace(np.log10(x), np.log10(nA), nBbins)/float(nA), sums-std, sums+std, color = color_fill, alpha=0.50)
-        
-        
-        mmin = 40
-        mmax = 200
-        nbins = 8
-
-        
-        big_kld = []
-        
-        frame = temp_frame
-        
-        frame = frame.loc[frame['truth'+bkgs[0][0]] == 1]
-        nA = len(frame)
-        print(nA)
-        mass_a = frame.loc[frame['truth'+bkgs[0][0]] == 1]['fj_sdmass'].values
-        spec_a = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-        spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
-        spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
-        spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-        nA = spec_ohe_a.shape[0]
-        
-        for nA, x,  color, color_fill in zip(np.logspace(np.log10(len(frame)) - 2, np.log10(len(frame)), 3), np.logspace(0, 2, 3), ['red', 'blue', 'green'], ['salmon', 'lightblue', 'lightgreen']): 
-            
-            big_kld = []
-            
-            mass_a = frame.loc[frame['truth'+bkgs[0][0]] == 1]['fj_sdmass'].values
-            spec_a = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-            spec_ohe_a = np.zeros((spec_a.shape[0],nbins))
-            spec_ohe_a[np.arange(spec_a.shape[0]),spec_a] = 1
-            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-            
-            
-            spec_ohe_a = spec_ohe_a[:int(nA)]                         
-            spec_ohe_a_sum = np.sum(spec_ohe_a,axis=0)/spec_ohe_a.shape[0]
-            nA = spec_ohe_a.shape[0]
-      
-            for nB in np.logspace(np.log10(x), np.log10(nA), nBbins):    
-                kld = []
-                for i in range(ndatapoints): 
-                    index = np.random.randint(0, int(nA), int(nB))
-                    spec_ohe_b = spec_ohe_a[index] 
-                    spec_ohe_b_sum = np.sum(spec_ohe_b,axis=0)/spec_ohe_b.shape[0]
-                    kld.append(1./scipy.stats.entropy(spec_ohe_b_sum, spec_ohe_a_sum, base=2))      
-                big_kld.append(kld)
-                print(nB)
-                
-            sums = np.array([np.mean(i) for i in big_kld])
-            std = [np.std(i) for i in big_kld]
-           
-            plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums, color = color, label = "Mass dist., nA = " + str(nA))
-            
-            from scipy.optimize import curve_fit
-            
-            def myExpFunc(x, a, b):
-                return a * np.power(x, b)
-            popt, pcov = curve_fit(myExpFunc, np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums)
-            print('look here')
-            print(popt)
-            
-            plt.plot(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, myExpFunc(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, *popt))
-            plt.fill_between(np.logspace(np.log10(x), np.log10(nA), nBbins)/nA, sums-std, sums+std, color = color_fill, alpha=0.50)
-       
-        
-        ax.set_xlim(0.00052932,1)
-        ax.set_ylim(1e-2,70000)
-        ax.set_xlabel(r'nB/nA',ha='right', x=1.0)
-        ax.set_ylabel(r'1 / $D_\mathrm{JS}$',ha='right', y=1.0)
-        
-        import matplotlib.ticker as plticker
-        
-        #ax.tick_params(direction='in', axis='both', which='major', labelsize=15, length=12 )
-        #ax.tick_params(direction='in', axis='both', which='minor' , length=6)
-        ax.xaxis.set_ticks_position('both')
-        ax.yaxis.set_ticks_position('both')    
-        ax.grid(which='minor', alpha=0.5, linestyle='dotted')
-        ax.grid(which='major', alpha=0.9, linestyle='dotted')
-        
-        leg = ax.legend(borderpad=1, frameon=False, loc='upper left', fontsize=16)
-       
-       
-        leg._legend_box.align = "right"
-        
-        ax.annotate(eraText, xy=(1e3, 1.1e7), fontname='Helvetica', ha='left',
-                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$\mathbf{CMS}$', xy=(1.1, 1.1e7), fontname='Helvetica', fontsize=24, fontweight='bold', ha='left',
-                    bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
-        ax.annotate('$Simulation\ Open\ Data$', xy=(3, 1.1e7), fontsize=18, fontstyle='italic', ha='left',
-                    annotation_clip=False)
-        
-        f.savefig(os.path.join(savedir, "JSD_limit" + ".pdf"), dpi=400)
-        f.savefig(os.path.join(savedir, "JSD_limit" + ".png"), dpi=400)
-        plt.close(f)     
-           
-    def get_jsd_limit(frame=[], nB=0.1, eps_bkg=0, savedir=""):   
-        
-        ndatapoints = 2
-        
-        mmin = 40
-        mmax = 200
-        nbins = 8
-        
-        frame = frame.loc[frame['truth'+'QCD'] == 1]
-        N = len(frame)
-
-        jsds = []
-        for i in range(ndatapoints): 
-            nB_exp = np.random.poisson(nB)
-            
-            if nB_exp > nB: nB_exp = nB
-                
-            index_b = np.random.choice(int(N), int(nB_exp),replace=False)
-            index_a = np.delete(range(N), index_b)
-
-            #frame_a = frame.iloc[index_a]
-            frame_b = frame.iloc[index_b] 
-            frame_a = frame 
-            
-            mass_a = frame_a['fj_sdmass'].values
-            mass_b = frame_b['fj_sdmass'].values
-
-            # digitze into bins
-            spec_pass = np.digitize(mass_a, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-            spec_fail = np.digitize(mass_b, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-            # one hot encoding
-            spec_ohe_pass = np.zeros((spec_pass.shape[0],nbins))
-            spec_ohe_pass[np.arange(spec_pass.shape[0]),spec_pass] = 1
-            spec_ohe_pass_sum = np.sum(spec_ohe_pass,axis=0)
-            #for i in range(len(spec_ohe_pass_sum)): 
-            #    spec_ohe_pass_sum[i] = np.random.poisson(spec_ohe_pass_sum[i])
-            spec_ohe_pass_sum = spec_ohe_pass_sum/spec_ohe_pass.shape[0]
-
-            spec_ohe_fail_sum = np.array([int(i*nB_exp)/float(nB_exp) for i in spec_ohe_pass_sum])
-            
-            
-            #spec_ohe_fail = np.zeros((spec_fail.shape[0],nbins))
-            #spec_ohe_fail[np.arange(spec_fail.shape[0]),spec_fail] = 1
-            #spec_ohe_fail_sum = np.sum(spec_ohe_fail,axis=0)
-            #for i in range(len(spec_ohe_fail_sum)): 
-            #    spec_ohe_fail_sum[i] = np.random.poisson(spec_ohe_fail_sum[i])
-            #spec_ohe_fail_sum = spec_ohe_fail_sum/spec_ohe_fail.shape[0]
-            
-            
-            M = 0.5*spec_ohe_pass_sum+0.5*spec_ohe_fail_sum
-            kld_pass = scipy.stats.entropy(spec_ohe_pass_sum,M,base=2)
-            kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
-            jsd = 0.5*kld_pass+0.5*kld_fail
-
-            jsds.append(1./jsd)      
-
-        '''
-        f, ax = plt.subplots(figsize=(10, 10))
-        plt.hist(jsds, bins = 10) 
-
-        ax.set_xlabel(r'JSD',ha='right', x=1.0)
-        ax.set_ylabel(r'Count (Events)',ha='right', y=1.0)
-        plt.axvline(np.mean(jsds), color = 'red')
-        plt.title(r'JSD Distribution, nB/nA = {:0.5f}'.format(eps_bkg))
-        f.savefig(os.path.join(savedir,'JSD_Distribution_epsbkg{:0.2f}.png'.format(eps_bkg)), dpi=400)
-        '''
-        print(np.mean(jsds))
-        
-        return(np.mean(jsds), np.std(jsds))
-        
-    
-    def bestpartition_JSD(frame, eps, max_iter=None):
-        mmin = 40
-        mmax = 200
-        nbins = 8
-        
-        frame = frame.loc[frame['truth'+'QCD'] == 1]
-        masses = frame['fj_sdmass'].values
-        spec_pass = np.digitize(masses, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-        spec_ohe_pass = np.zeros((spec_pass.shape[0],nbins))
-        spec_ohe_pass[np.arange(spec_pass.shape[0]),spec_pass] = 1
-        spec_ohe_pass_sum = np.sum(spec_ohe_pass,axis=0)
-        h = spec_ohe_pass_sum
-        print(h)
-        
-        A_base = np.asarray(h*eps, dtype=int)
-        B_base = h - A_base
-        
-        nBins = len(h)
-        ## all ways to go 
-        j=[]
-        for i,swap in enumerate(itertools.product([0,-1,1], repeat=len(h))):
-            A = np.maximum(A_base + swap, np.zeros(nBins))
-            B = np.maximum(B_base - swap, np.zeros(nBins))
-            if np.sum(A)==0 or np.sum(B)==0: continue
-            A = A/np.sum(A)
-            B = B/np.sum(B)
-            j.append(JSD(A,B))
-            #print(swap,j[-1])
-            if max_iter and i>max_iter: break
-
-        return j
-    
+        return(big_cuts)
     
     def JSD(A,B):
         S = A/2. + B/2.
@@ -553,11 +336,18 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         rhomax = -1
         bins = 20
 
-        dfs.insert(3, dfs[0])
+        # Specifically ordered in this method for paper
+        dfs.insert(1, dfs[0])
+        dfs.insert(3, dfs[1])
+        dfs.insert(5, dfs[2])
         temp_names = np.copy(names)
-        temp_names = np.insert(temp_names, 3, 'Interaction network, DDT')
-        sigs.append('Hbb')
-        bkgs.append('QCD')
+        temp_names = np.insert(temp_names, 1, 'IN, DDT')
+        temp_names = np.insert(temp_names, 3, 'Deep double-b, DDT')
+        temp_names = np.insert(temp_names, 5, 'Deep double-b+, DDT')
+        for i in range(3):
+            sigs.append('Hbb')
+            bkgs.append('QCD')
+    
         min_jsd_eff = 2e-4
         mmin = 40
         mmax = 200
@@ -565,10 +355,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         f, ax = plt.subplots(figsize=(10, 10))
         ax.loglog()
         line_styles = [':', ':', '--', '-', '-', '-.']
-        
+        counter = -1
         for frame, name, sig, bkg, color, style in zip(dfs, temp_names, sigs, bkgs, colors, line_styles):
             
-            if name not in ['Interaction network, DDT']:
+            if name in ['Interaction network', 'Deep double-b', 'Deep double-b+']:
                 
                 truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
                 fpr, tpr, threshold = roc_curve(truth, predict)
@@ -578,7 +368,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 cuts = {}
                 jsd_plot = []
                 eb_plot = []
-                print(len(frame))
                 for wp,marker in zip([0.5,0.9,0.95],['^','s','o','v']): # % signal eff.
                     idx, val = find_nearest(tpr, wp)
                     cuts[str(wp)] = threshold[idx] # threshold for deep double-b corresponding to ~1% mistag rate
@@ -588,14 +377,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
-
-
-                    #mass_pass_temp = mass_pass[np.random.randint(0, len(mass_pass), int(min_jsd_eff*len(mass_pass)) + 1)]
-                    #mass_fail_temp = mass_fail[np.random.randint(0, len(mass_fail), int(min_jsd_eff*len(mass_fail)) + 1)]
-
-                    #mass_pass = mass_pass[:int(min_jsd_eff*len(mass_pass)) + 1]
-                    #mass_fail = mass_fail[:int(min_jsd_eff*len(mass_fail))]
-
 
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -620,50 +401,29 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     eb_plot.append(1/fpr[idx])
                     jsd_plot.append(1/jsd)
                     ax.plot([1/fpr[idx]],[1/jsd],marker=marker,markersize=12,color=color)
-                    
-            else:
+                   
+            elif name in ['IN, DDT', 'Deep double-b, DDT', 'Deep double-b+, DDT']:
                 
+                counter += 1
                 truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
                 fpr, tpr, threshold = roc_curve(truth, predict)
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
                 print("{}, Acc={}%".format(name, accuracy_score(truth,predict>0.5)*100), "Sig:", sig, "Bkg:", bkg)
 
-                cuts = {}
+                
                 jsd_plot = []
                 eb_plot = []
-          
-
-                aux_scale = 1/100.
-               
-                model = GradientBoostingRegressor(loss='ls',
-                                                  n_estimators=200, 
-                                                  min_samples_leaf=5, min_samples_split=5, 
-                                                  max_depth=5, 
-                                                  verbose=1)
-         
-                data_train = [[i] for i in TPR_range]
-            
-                print(data_train)
-                print(FPR_range)
-                
-                model.fit(data_train, FPR_range/aux_scale)
-                
-                big_cuts = np.load('DDT_TPRcuts_sdmass.npy')
                 
                 for wp,marker in zip([50.,90.,95.],['^','s','o', 'v']): # % signal eff.
                     idx, val = find_nearest(tpr, wp/100)
-
-                    mask_pass = (frame['predict'+sig[0]] > big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
-                    mask_fail = (frame['predict'+sig[0]] < big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
+                    cuts = quantile_regression_DDT_FPR(cut(frame), cut(frame), 1+wp)           
+                    mask_pass = (frame['predict'+sig[0]] > cuts) & frame['truth'+bkg[0]]
+                    mask_fail = (frame['predict'+sig[0]] < cuts) & frame['truth'+bkg[0]]
+                    
+                    
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
-
-                    #mass_pass_temp = mass_pass[np.random.randint(0, len(mass_pass), int(min_jsd_eff*len(mass_pass)) + 1)]
-                    #mass_fail_temp = mass_fail[np.random.randint(0, len(mass_fail), int(min_jsd_eff*len(mass_fail)) + 1)]
-
-                    #mass_pass = mass_pass[:int(min_jsd_eff*len(mass_pass))]
-                    #mass_fail = mass_fail[:int(min_jsd_eff*len(mass_fail))]
 
                     # digitze into bins
                     spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
@@ -683,12 +443,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
                     jsd = 0.5*kld_pass+0.5*kld_fail
                     
-                    FPR_wp = 1./(model.predict([[wp/100.]])[0]*aux_scale)
-                    
+                    #FPR_wp = 1./(model.predict([[wp/100.]])[0]*aux_scale)
+           
+                    FPR_wp = 1./make_FPR_DDT(cut(frame), 1+wp, siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=name)
                     print('eS = %.2f%%, eB = %.2f%%, 1/eB=%.2f, jsd = %.2f, 1/jsd = %.2f'%(tpr[idx]*100,fpr[idx]*100,1/fpr[idx],jsd,1/jsd))
-                    
-                    
-                    print(FPR_wp)
                     
                     eb_plot.append(FPR_wp)
                     jsd_plot.append(1/jsd)
@@ -697,44 +455,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
              
                    
             ax.plot(eb_plot,jsd_plot,linestyle=style,label=name,color=color)
-        
-        
-        
-        min_jsd = []
-        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
-        for eps_bkg in np.logspace(0.1,4, 10): 
-            #min_jsd.append(get_jsd_limit(dfs[0], size/eps_bkg, 1/eps_bkg, savedir))
-            bestpart = bestpartition_JSD(dfs[0], 1/eps_bkg)
-            min_jsd.append([max(bestpart)])
-        
-        
-        ax.plot(np.logspace(0.1, 4, 10), [i[0] for i in min_jsd], lw = 5, linestyle='--', label='Statistical Limit JSD')
-        #plt.fill_between(np.logspace(0, 4, 10), [i[0]-i[1] for i in min_jsd],[i[0]+i[1] for i in min_jsd], color = 'lightblue', alpha=0.50)
-        
-        #size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
-        #min_jsd = get_jsd_limit(dfs[0], nB=min_jsd_eff*size)
-        #print("[5.26173191e+04 1.03417247e+00]101347.09877133417")
-        
-        '''
-        def myExpFunc(x):
-            return 101000 * np.power(x, 1.03417247e+00)
-        
-        min_jsd = []
-        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
-        for nB in size/np.logspace(np.log10(1), np.log10(1e4), 10): 
-            print(nB)
-            min_jsd.append(myExpFunc(nB/size))
-        
-        print(min_jsd)
-        
-        ax.plot(np.logspace(0, 4, 10), min_jsd, linestyle='--', label='Statistical Limit JSD')
-        print(get_jsd_limit(dfs[0], size))
-
-        '''
-        #min_jsd = [get_jsd_limit(frame=dfs[0], nB=min_jsd_eff * len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1]))[0] for i in range(10)]
-        
-        #ax.plot([1, 1e4], [np.mean(min_jsd), np.mean(min_jsd)], linestyle='--', label='Statistical Limit JSD')
-        #plt.fill_between([1, 1e4], [min_jsd[0]-min_jsd[1], min_jsd[0]-min_jsd[1]], [min_jsd[0]+min_jsd[1], min_jsd[0]+min_jsd[1]], color = 'lightblue', alpha=0.50)
         
         ax.set_xlim(1,2e3)
         ax.set_ylim(1,1e9)
@@ -793,12 +513,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         rhomax = -1
         bins = 20
              
-        dfs.insert(3, dfs[0])
+        dfs.append(dfs[2])
         temp_names = np.copy(names)
-        temp_names = np.insert(temp_names, 3, 'Interaction network, DDT')
+        temp_names = np.append(temp_names, 'Interaction network, DDT')
         sigs.append('Hbb')
         bkgs.append('QCD')
-        
         mmin = 40
         mmax = 200
         nbins = 8
@@ -880,50 +599,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 cuts = {}
                 jsd_plot = []
                 es_plot = []
-                big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
+                
                     
                 #for wp,marker in zip([0.5,1.,5.,10.],['v','^','s','o']): # % bkg rej.
                 for wp,marker in zip([1.,5.,10.],['^','s','o']): # % bkg rej.
                     idx, val = find_nearest(fpr, wp/100)
-                    '''
-                    jsds = []
-                    
-                    for i in range(100): 
-                        index = np.random.randint(0, len(frame), int(min_jsd_eff*len(frame)))
-                        
-                        mask_pass = (frame.iloc[index]['predict'+sig[0]] > big_cuts.item().get(str(wp))[index]) & frame.iloc[index]['truth'+bkg[0]]
-                        mask_fail = (frame.iloc[index]['predict'+sig[0]] < big_cuts.item().get(str(wp))[index]) & frame.iloc[index]['truth'+bkg[0]]
-                        mass = frame.iloc[index]['fj_sdmass'].values
-                        mass_pass = mass[mask_pass]
-                        mass_fail = mass[mask_fail]
-
-                        #mass_pass_temp = mass_pass[np.random.randint(0, len(mass_pass), int(min_jsd_eff*len(mass_pass)))]
-                        #mass_fail_temp = mass_fail[np.random.randint(0, len(mass_fail), int(min_jsd_eff*len(mass_fail)))]
-
-                        #mass_pass = mass_pass[:int(min_jsd_eff*len(mass_pass))]
-                        #mass_fail = mass_fail[:int(min_jsd_eff*len(mass_fail))]
-
-                        # digitze into bins
-                        spec_pass = np.digitize(mass_pass, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-                        spec_fail = np.digitize(mass_fail, bins=np.linspace(mmin,mmax,nbins+1), right=False)-1
-                        # one hot encoding
-                        spec_ohe_pass = np.zeros((spec_pass.shape[0],nbins))
-                        spec_ohe_pass[np.arange(spec_pass.shape[0]),spec_pass] = 1
-                        spec_ohe_pass_sum = np.sum(spec_ohe_pass,axis=0)/spec_ohe_pass.shape[0]
-                        spec_ohe_fail = np.zeros((spec_fail.shape[0],nbins))
-                        spec_ohe_fail[np.arange(spec_fail.shape[0]),spec_fail] = 1
-                        spec_ohe_fail_sum = np.sum(spec_ohe_fail,axis=0)/spec_ohe_fail.shape[0]
-                        M = 0.5*spec_ohe_pass_sum+0.5*spec_ohe_fail_sum
-
-                        kld_pass = scipy.stats.entropy(spec_ohe_pass_sum,M,base=2)
-                        kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
-                        jsd = 0.5*kld_pass+0.5*kld_fail
-                        jsds.append(jsd)
-                    jsd = np.mean(jsds) 
-                    '''
-                    
-                    mask_pass = (frame['predict'+sig[0]] > big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
-                    mask_fail = (frame['predict'+sig[0]] < big_cuts.item().get(str(wp))) & frame['truth'+bkg[0]]
+                    cuts = quantile_regression_DDT_FPR(cut(frame), cut(frame), wp) 
+                    mask_pass = (frame['predict'+sig[0]] > cuts) & frame['truth'+bkg[0]]
+                    mask_fail = (frame['predict'+sig[0]] < cuts) & frame['truth'+bkg[0]]
                     mass = frame['fj_sdmass'].values
                     mass_pass = mass[mask_pass]
                     mass_fail = mass[mask_fail]
@@ -949,8 +632,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     kld_pass = scipy.stats.entropy(spec_ohe_pass_sum,M,base=2)
                     kld_fail = scipy.stats.entropy(spec_ohe_fail_sum,M,base=2)
                     jsd = 0.5*kld_pass+0.5*kld_fail
-                    
-                    print(make_TPR_DDT(frame, wp, siglab='QCD', sculp_label='fj_sdmass', taggerName=name))
                     print('eS = %.2f%%, eB = %.2f%%, 1/eB=%.2f, jsd = %.2f, 1/jsd = %.2f'%(tpr[idx]*100,fpr[idx]*100,1/fpr[idx],jsd,1/jsd))
                     es_plot.append(make_TPR_DDT(frame, wp, siglab='QCD', sculp_label='fj_sdmass', taggerName=name))
                     jsd_plot.append(1/jsd)
@@ -958,40 +639,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     
                     
                 ax.plot(es_plot,jsd_plot,linestyle='-',label=name,color=color)
-        
-        '''
-        def find_nearest(array,value):
-            idx = (np.abs(array-value)).argmin()
-            return idx, array[idx]
-        
-        def myExpFunc(x):
-            return 101000 * np.power(x, 1.03417247e+00)
-        
-        truth, predict, db =  roc_input(dfs[0], signal=['Hbb'], include = ['Hbb', 'QCD'], norm=norm)
-        fpr, tpr, threshold = roc_curve(truth, predict)
-        
-        min_jsd = []
-        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
-        for nB in np.linspace(0, 1, 30): 
-            idx, arr = find_nearest(tpr, nB)
-            
-            print(fpr[idx])
-            min_jsd.append(myExpFunc(fpr[idx]))
-               
-        ax.plot(np.linspace(0, 1, 30), min_jsd, linestyle='--', label='Statistical Limit JSD')
-        '''
-        
-        min_jsd = [get_jsd_limit(frame=dfs[0], nB=min_jsd_eff* len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1]))[0] for i in range(10)]
-        
-        ax.plot([0, 1], [np.mean(min_jsd), np.mean(min_jsd)], linestyle='--', label='Statistical Limit JSD')
-        
-        
-        '''
-        size = len(dfs[0].loc[dfs[0]['truth'+'QCD'] == 1])
-        min_jsd = get_jsd_limit(dfs[0], nB=min_jsd_eff*size)
-        ax.plot([0, 1], [min_jsd[0], min_jsd[0]], linestyle='--', label='Statistical Limit JSD')
-        plt.fill_between([0, 1], [min_jsd[0]-min_jsd[1], min_jsd[0]-min_jsd[1]], [min_jsd[0]+min_jsd[1], min_jsd[0]+min_jsd[1]], color = 'lightblue', alpha=0.50)
-        '''
+    
         ax.set_xlim(0,1)
         ax.set_ylim(1,5e4)
         ax.set_xlabel(r'Tagging efficiency ($\mathrm{H \rightarrow b\bar{b}}$) $\varepsilon_\mathrm{sig}$',ha='right', x=1.0)
@@ -1068,10 +716,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         ctdf = tdf.copy()
         ctdf = ctdf.head(0)
 
-        #ctdf = quantile_regression_DDT(tdf, tdf_train, FPR_cut)
-        big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
+        cuts = quantile_regression_DDT_FPR(tdf, tdf_train, FPR_cut)
+        #big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
 
-        cuts = big_cuts.item().get(str(round(FPR_cut, 5)))
+        #cuts = big_cuts.item().get(str(round(FPR_cut, 5)))
         
         ctdf = ctdf.append(tdf.loc[tdf['predict'+'Hbb'].values > cuts[:len(tdf)]])
         
@@ -1114,12 +762,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         ctdf = tdf.copy()
         ctdf = ctdf.head(0)
 
-        cuts = quantile_regression_DDT(tdf, tdf_train, TPR_cut)
-        #big_cuts = np.load('DDT_TPRcuts_sdmass.npy')
-        #print(TPR_cut)
-        
-        #cuts = big_cuts.item().get(str(round(TPR_cut, 5)))
-        print(cuts)
+        cuts = quantile_regression_DDT_TPR(tdf, tdf_train, TPR_cut)
         ctdf = ctdf.append(tdf.loc[tdf['predict'+'Hbb'].values > cuts])
         
    
@@ -1127,9 +770,59 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         selected = sum(weight) 
         
         return(float(selected)/correct)
+    
+    def DDT_Accuracy(tdf, TPR_cut=50, siglab="Hbb", sculp_label='Light', sig = ['Hbb'], bkg = ["QCD"], savedir="", taggerName=""): 
         
+        
+        NBINS= 8 # number of bins for loss function
+        MMAX = 200. # max value
+        MMIN = 40. # min value
+
+
+        weight_Hbb = tdf['truth'+'Hbb'].values
+        weight_QCD = tdf['truth'+'Hbb'].values
+        bins = np.linspace(40,200,NBINS+1)
+
+        #correct = sum(weight)
+        if siglab == sculp_label: return 
+        def find_nearest(array,value):
+            idx = (np.abs(array-value)).argmin()
+            return idx, array[idx]
+
+        if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
+            legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
+            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
+        else:
+            legend_siglab = siglab
+        if sculp_label[0] in ["H", "Z", "g"] and len(sculp_label) == 3:
+            legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
+            legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
+        else: legend_bkglab = sculp_label
+
+
+        # Placing events in bins to detemine threshold for each individual bin
+
+        ctdf = tdf.copy()
+        ctdf = ctdf.head(0)
+
+        cuts = quantile_regression_DDT_FPR(tdf, tdf_train, TPR_cut)
+        #big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
+
+        #cuts = big_cuts.item().get(str(round(FPR_cut, 5)))
+        
+        ctdf = ctdf.append(tdf.loc[tdf['predict'+'Hbb'].values > cuts])
+        truth, predict, db =  roc_input(ctdf, signal=sig, include = sig+bkg, norm=False)
+        accuracy = accuracy_score(truth, predict>0.5)
+        weight = ctdf['truth'+'Hbb'].values
+        selected = sum(weight) 
+
+        return(accuracy)
+    
     def make_DDT(tdf, FPR_cut=[], siglab="Hcc", sculp_label='Light', savedir="", taggerName=""): 
-        from sklearn.ensemble import GradientBoostingRegressor
+        #############################################################
+        ### This method is depricated in favor of GBR DDT Methods ###
+        #############################################################
+    
 
         NBINS= 8 # number of bins for loss function
         MMAX = 200. # max value
@@ -1162,7 +855,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                   
                     
         f, ax = plt.subplots(figsize=(10,10))
-        big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
+        big_cuts = np.load('DDT_FPRcuts_sdmass.npy') #premade DDT cuts
         #big_cuts = {}
         ctdf = tdf.copy()
         ctdf = ctdf.head(0)
@@ -1174,9 +867,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             cuts = quantile_regression_DDT(tdf, tdf_train, FPR_cut[FPR])
             #big_cuts[str(round(FPR_cut[FPR], 5))] = cuts
             dataframes_cut[FPR] = dataframes_cut[FPR].append(tdf.loc[tdf['predict'+'Hbb'].values > cuts])
-
-        #np.save('DDT_TPRcuts_sdmass.npy', big_cuts)
-        #sys.exit()
 
         f, ax = plt.subplots(figsize=(10,10))
         h_list = []
@@ -1261,15 +951,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         
         f, ax = plt.subplots(figsize=(10,10))
         weight_uncut = tdf['truth'+'Hbb'].values.astype(float)
-        
-        '''
-        h_list=[]
-        n, binEdges = np.histogram(tdf.loc[tdf['truth'+'QCD'] == 1]['fj_sdmass'].values, bins=bins)
-        h_list.append(create_TH1D(tdf['fj_sdmass'].values, name='No tagging applied', title=None, binning=bins, weights=weight_uncut/np.sum(weight_uncut), h2clone=None, axis_title = ['Soft-Drop Mass', 'Normalized Scale (Hbb)'], opt='', color = 1))
-        h_list[-1].SetMarkerStyle(20)
-        h_list[-1].SetMarkerColor(1)
-        h_list[-1].SetStats(0)
-        '''
+    
         
         for FPR in range(len(FPR_cut)): 
             weight = dataframes_cut[FPR]['truth'+'Hbb'].values.astype(float)
@@ -1333,7 +1015,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             idx = (np.abs(array-value)).argmin()
             return idx, array[idx]
         
-        line_styles = ['--', '-.', ':', '--', '-.']
+        line_styles = ['-', '-.', '--', '--', '-.']
         line_widths = [2.5, 2.5, 3, 2.5, 2.5]
         
         if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
@@ -1349,7 +1031,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         f, ax = plt.subplots(figsize=(10,10))
         for tdf, name, style, width in zip(tdf_array, names_array, line_styles, line_widths):
            
-            if name == "Interaction network": 
+            # Specify taggers that require DDT decorrelation here
+            if name in ['Interaction network', 'Deep double-b', 'Deep double-b+']: 
                 
                 truth, predict, db = roc_input(tdf, signal=[siglab], include = [siglab, 'QCD'])
                 fpr, tpr, threshold = roc_curve(truth, predict)
@@ -1365,36 +1048,29 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
                     ctdf = tdf[tdf['predict'+siglab].values > cut]
                     weight = ctdf['truth'+sculp_label].values
-                    print(float(len(ctdf))/len(tdf))
                     
-                    
-                    if str(wp) == '1.0':
+                    if str(wp) == '1.0' and name in ['Interaction network']:
                         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), 
                             linestyle='-', lw=4, normed=False,
                             histtype='stepfilled',label='No tagging applied', alpha=0.3)
                         
-                    else:   
-                        ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), lw=width, linestyle = style, normed=False,
-                            histtype='step',label=' {}'.format(name))
-                        
-                 
-                # DDT
-                big_cuts = np.load('DDT_FPRcuts_sdmass.npy')
+                    elif str(wp) != '1.0':   
+                        ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), lw=width, linestyle = style,    
+                                normed=False, histtype='step',label=' {}'.format(name))
+
                 ctdf = tdf.copy()
                 ctdf = ctdf.head(0)
                 FPR_cut = [float(sculpt_wp)]
                 bins = np.linspace(40,240,11)
                 dataframes_cut = [ctdf for i in range(len(FPR_cut))]
                 for FPR in range(len(FPR_cut)):
-                    cuts = big_cuts.item().get(str(round(FPR_cut[FPR], 5)))
-            
+                    cuts = quantile_regression_DDT_FPR(tdf, tdf, FPR_cut[FPR])
                     dataframes_cut[FPR] = dataframes_cut[FPR].append(tdf.loc[tdf['predict'+siglab].values > cuts])
 
                 h_list = []
 
                 weight_uncut = tdf['truth'+sculp_label].values.astype(float)
                                     
-                print(float(len(dataframes_cut[FPR]))/len(tdf))
 
                 for FPR in range(len(FPR_cut)):
                     weight = dataframes_cut[FPR]['truth'+sculp_label].values.astype(float)
@@ -1403,11 +1079,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                             lw=3, 
                             normed=False,
                             histtype='step',
-                            linestyle = '--', 
-                            label='{}'.format('Interaction network, DDT')
+                            linestyle = style, 
+                            label='{}'.format(name + ', DDT')
                            )
             else: 
-                print(name)
                 truth, predict, db = roc_input(tdf, signal=[siglab], include = [siglab, 'QCD'])
                 fpr, tpr, threshold = roc_curve(truth, predict)
 
@@ -1422,9 +1097,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     
                     ctdf = tdf[tdf['predict'+siglab].values > cut]
                     weight = ctdf['truth'+sculp_label].values
-                    
-                    print(float(len(ctdf))/len(tdf))
-
                     if str(wp) != '1.0':
                         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), 
                                 lw=width, linestyle=style, normed=False,
@@ -1436,7 +1108,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                             #ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), lw=2, normed=False,
                             #        histtype='step',label='No tagging applied')
             
-        
+                
 
         frame = tdf_array[0]
         ax.set_xlabel(r'$\mathrm{m_{SD}\ [GeV]}$', ha='right', x=1.0)
@@ -1840,10 +1512,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             fpr, tpr, threshold = roc_curve(truth, predict)
             return fpr, tpr
         
-        line_styles = ['--', '-.', ':', '--', '-.']
+        line_styles = ['-', '-.', ':', '--', '-.']
         line_widths = [2.5, 2.5, 3, 2.5, 2.5]
-        
-        print(names_array)
         
         f, ax = plt.subplots(figsize=(10,10))
         for xdf, taggerName, style, width in zip(tdf_array, names_array, line_styles, line_widths):
@@ -1862,7 +1532,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
             for pu in pts:
                 fpr, tpr = roc(xdf, pu,pu+step)
-                ix, mistag =  find_nearest(fpr, 0.01)
+                ix, mistag =  find_nearest(fpr, sculpt_wp)
                 efftight.append(tpr[ix])
             
 
@@ -1872,8 +1542,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
             efftight = [efftight[0]] + efftight + [efftight[-1]]
             ax.step(pts, efftight, lw=width, label=taggerName, linestyle=style)
-
-            if taggerName == 'Interaction network':
+            '''
+            if taggerName in ['Interaction network', 'Deep double-b', 'Deep double-b+']:
                 
                 step = 5
                 pts = np.arange(0,50,step)
@@ -1892,8 +1562,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 pts = np.concatenate((pts, np.array([50])))
 
                 efftight = [efftight[0]] + efftight + [efftight[-1]]
-                ax.step(pts, efftight, lw=width, label='Interaction network, DDT', linestyle='-')   
-            
+                ax.step(pts, efftight, lw=width, label=taggerName + ', DDT', linestyle='-')   
+            '''
         
         ax.set_xlabel(r'Reconstructed primary vertices', ha='right', x=1.0)
        
@@ -1915,7 +1585,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         #ax.grid(which='minor', alpha=0.5, axis='y', linestyle='dotted')
         ax.grid(which='major', alpha=0.9, linestyle='dotted')
         leg = ax.legend(borderpad=1, frameon=False, loc=1, fontsize=14 )
-        mpt = ""+str(int(round((min(xdf.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(xdf.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(xdf.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(xdf.fj_sdmass)))))+" GeV" + "\n {}".format('1\% mistagging rate')
+        mpt = ""+str(int(round((min(xdf.fj_pt)))))+" $\mathrm{<\ jet\ p_T\ <}$ "+str(int(round((max(xdf.fj_pt)))))+" GeV"       + "\n "+str(int(round((min(xdf.fj_sdmass)))))+" $\mathrm{<\ jet\ m_{SD}\ <}$ "+str(int(round((max(xdf.fj_sdmass)))))+" GeV" + "\n {}".format(str(sculpt_wp*100)+'\% mistagging rate')
         ax.annotate( mpt, xy=(0.05, 0.85), xycoords='axes fraction', fontname='Helvetica', ha='left',
             bbox={'facecolor':'white', 'edgecolor':'white', 'alpha':0, 'pad':13}, annotation_clip=False)
         leg._legend_box.align = "right"
@@ -2156,95 +1826,64 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 f.savefig(os.path.join(savedir, 'dist_'+feature+'_'+"-".join(t for t in truths if len(t)>1)+'.pdf'), dpi=400)
                 f.savefig(os.path.join(savedir, 'dist_'+feature+'_'+"-".join(t for t in truths if len(t)>1)+'.png'), dpi=400)
             plt.close(f)                                
-            print()
-    
     
     # plot BIG comparison ROC - hardcoded for now
     make_dirs(os.path.join(outputDir,'Plots'))
-
+    
     plot_rocs(dfs=[cut(frame) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
               sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
               bkgs=[['QCD'],['QCD'],['QCD'],['QCD']])
     
-   
-    
     tdf_train = cut(cutrho(tdf_train))
     
     FPR_range = np.logspace(-1, 1.9999999999, 20)
     TPR_range = [] 
-    for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
+    
+    for frame,savedir,taggerName in zip([dataframes[i] for i in [0, 1, 2]],savedirs,taggerNames):
         
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
         savedir = os.path.join(outputDir,savedir)
         make_dirs(savedir)
         
-        for FPR in range(len(FPR_range)): 
-            TPR_range.append(make_TPR_DDT(cut(cutrho(frame)), FPR_range[FPR], siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
-            FPR_range[FPR] = float(FPR_range[FPR])/100      
+        TPR_range_frame = []
+        for FPR in range(len(FPR_range)):     
+            TPR_range_frame.append(make_TPR_DDT(cut(cutrho(frame)), FPR_range[FPR], siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName)) 
+        TPR_range.append(TPR_range_frame)
         
-        break
-            
+        #print(DDT_Accuracy(cut(cutrho(frame)), 50, sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
+        
+    FPR_range = [float(FPR_range[FPR])/100 for FPR in range(len(FPR_range))]
+    
     plot_rocs_with_DDT(dfs=[cut(cutrho(frame)) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
-             sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
+              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
               bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD']], DDT_results = [TPR_range, FPR_range])
     
-   
     plot_jsd(dfs=[cut(cutrho(frame)) for frame in dataframes],
              savedir=os.path.join(outputDir,'Plots'),
              names=taggerNames,
              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
              bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
- 
-    plot_jsd_sig(dfs=[cut(cutrho(frame)) for frame in dataframes],
-             savedir=os.path.join(outputDir,'Plots'),
-             names=taggerNames,
-             sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
-             bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
     
+    #plot_jsd_sig(dfs=[cut(cutrho(frame)) for frame in dataframes],
+    #         savedir=os.path.join(outputDir,'Plots'),
+    #         names=taggerNames,
+    #         sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
+    #         bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
+
     sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='QCD', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
     
-    
     sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='Hbb', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)  
+    
     multiple_pu_dep([cut(cutrho(frame)) for frame in dataframes], taggerNames, sig_label='Hbb', bkg_label='QCD', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
-
+    
     tdf_train = cut(tdf_train)
     for frame,savedir,taggerName in zip(dataframes,savedirs,taggerNames):
         labels = [n[len("truth"):] for n in frame.keys() if n.startswith("truth")]
         frame = cut(cutrho(frame))
-        
-        if taggerName == "Interaction network": 
-            make_dirs(os.path.join(outputDir,"Plots/IN_DDT"))
-            
-            array_cuts = [50., 10., 5., 1.]
-            
-            '''
-            # DDT FPR Cuts
-            for FPR in np.logspace(-1, 1.9999999999, 20):
-                if FPR not in array_cuts: 
-                    array_cuts.append(FPR)
-            
-            for FPR in [0.5, 1.,5.,10.]: 
-                if FPR not in array_cuts: 
-                    array_cuts.append(FPR)     
-            
-            # DDT TPR Cuts
-            array_cuts = [95, 90, 50, 30]
-            
-            fit_quantile_reg(frame, 
-                             FPR_cut=array_cuts,
-                             savename='DDT_TPRcuts_sdmass')            
-            '''
-
-            make_DDT(frame, 
-                     FPR_cut=array_cuts, 
-                     siglab="Hbb", 
-                     savedir=os.path.join(outputDir,"Plots/IN_DDT"), 
-                     taggerName="Interaction Network, DDT")
-
             
         savedir = os.path.join(outputDir,savedir)
         make_dirs(savedir)
@@ -2252,7 +1891,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         for label in labels:
             for label2 in labels:
                 if label == label2: continue        
-                multiple_pu_dep(frame, savedir=savedir, sig_label=label, bkg_label=label2, taggerName=taggerName)
                 plot_rocs(dfs=[frame], savedir=savedir, names=[taggerName], 
                           sigs=[[label]], 
                           bkgs=[[label2]])
@@ -2277,19 +1915,24 @@ def main(args):
     evalDir = args.outdir 
 
     df = pd.read_pickle('output.pkl')
-    df_dec = pd.read_pickle('output_dec.pkl')
+    df_plus = pd.read_pickle('output_dec.pkl')   
     df_in = df.copy(deep=True)
+    prediction_ddb = np.load('%s/prediction_new.npy'%('DDB_datafraction_100'))
+    df_plus['predictHbb'] = prediction_ddb[:,1]
+    df_plus['predictQCD'] = prediction_ddb[:,0]
     prediction_in = np.load('%s/prediction_new.npy'%(args.indir))
     df_in['predictHbb'] = prediction_in[:,1]
     df_in['predictQCD'] = prediction_in[:,0]
-    df_in_adv = df.copy(deep=True)
-    prediction_in_adv = np.load('%s/prediction_new.npy'%(args.inadvdir))
-    df_in_adv['predictHbb'] = prediction_in_adv[:,1]
-    df_in_adv['predictQCD'] = prediction_in_adv[:,0]
-    df_in_rwgt = df.copy(deep=True)
-    prediction_in_rwgt = np.load('%s/prediction_new.npy'%(args.inrwgtdir))
-    df_in_rwgt['predictHbb'] = prediction_in_rwgt[:,1]
-    df_in_rwgt['predictQCD'] = prediction_in_rwgt[:,0]
+    
+    ### Removed in favor of DDT decorrelation method ###
+    #df_in_adv = df.copy(deep=True)
+    #prediction_in_adv = np.load('%s/prediction_new.npy'%(args.inadvdir))
+    #df_in_adv['predictHbb'] = prediction_in_adv[:,1]
+    #df_in_adv['predictQCD'] = prediction_in_adv[:,0]
+    #df_in_rwgt = df.copy(deep=True)
+    #prediction_in_rwgt = np.load('%s/prediction_new.npy'%(args.inrwgtdir))
+    #df_in_rwgt['predictHbb'] = prediction_in_rwgt[:,1]
+    #df_in_rwgt['predictQCD'] = prediction_in_rwgt[:,0]
     
     
     df_train = pd.read_pickle('output_train.pkl')
@@ -2297,9 +1940,9 @@ def main(args):
     prediction_in_train = np.load('%s/prediction_train_new.npy'%(args.indir))
     df_in_train['predictHbb'] = prediction_in_train[:,1]
     df_in_train['predictQCD'] = prediction_in_train[:,0]
-    
-    print(len(df_in))
-    print(len(df_in_train))
+    prediction_ddb_train = np.load('%s/prediction_train_new.npy'%(args.indir))
+    df_train['predictHbb'] = prediction_ddb_train[:,1]
+    df_train['predictQCD'] = prediction_ddb_train[:,0]
     
     # to add ntrueInt
     #save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test_moreinfo/'
@@ -2356,20 +1999,14 @@ def main(args):
     #plot_loss(args.indir,args.outdir, taggerName="Interaction network", eraText=r'2016 (13 TeV)')W
     #plot_loss(args.indecdir,args.outdir, taggerName="Interaction network mass decor.", eraText=r'2016 (13 TeV)')
     
-    make_plots(evalDir,
-               [df_in, df_in_adv, df_in_rwgt, df,df_dec], df_in_train,
-               savedirs=["Plots/IN", "Plots/IN_adversarial", "Plots/IN_rwgt", "Plots/DDB","Plots/DDB_dec"],
-               taggerNames=["Interaction network", "Interaction network, adversarial", "Interaction network, QCD reweight", "Deep double-b", "Deep double-b, mass decor."],
-               eraText=r'2016 (13 TeV)')
-
-    #make_plots(evalDir,
-    #           [df_in,df,df_dec],
-    #           savedirs=["Plots/IN","Plots/DDB","Plots/DDB_dec"],
-    #           taggerNames=["Interaction network", "Deep double-b", "Deep double-b mass decor."],
-    #           eraText=r'2016 (13 TeV)')
-
     
-    print('made plots?')
+    make_plots(evalDir,
+               [df_in, df,df_plus], df_in_train,
+               savedirs=["Plots/IN", "Plots/DDB","Plots/DDB_plus"],
+               taggerNames=["Interaction network", "Deep double-b", "Deep double-b+"],
+               eraText=r'2016 (13 TeV)')
+    
+    print('made plots')
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
@@ -2377,8 +2014,8 @@ if __name__ == "__main__":
     
     # Required positional arguments
     parser.add_argument("indir", help="IN results dir")
-    parser.add_argument("inadvdir", help="IN adversarial results dir")
-    parser.add_argument("inrwgtdir", help="IN QCD reweight results dir")
+    #parser.add_argument("inadvdir", help="IN adversarial results dir")
+    #parser.add_argument("inrwgtdir", help="IN QCD reweight results dir")
     parser.add_argument("-o", "--outdir", action='store', dest='outdir', default = 'IN_Run2', help="outdir")
 
     args = parser.parse_args()
