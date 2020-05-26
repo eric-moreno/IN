@@ -3,14 +3,15 @@ import torch
 import setGPU
 import argparse
 import onnx
+import onnxruntime as ort
 import warnings
-#from onnx_tf.backend import prepare
 import os
+import sys
     
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
-save_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+save_path = '/storage/group/gpu/bigdata/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
 
 params_2 = ['track_ptrel',     
           'track_erel',     
@@ -82,9 +83,7 @@ def main(args):
                        Do=args.Do)
     
     else:
-        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
-                           sv_branch=int(args.sv_branch),
-                           vv_branch=int(args.vv_branch),
+        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, 
                            De=args.De,
                            Do=args.Do)
     
@@ -101,14 +100,20 @@ def main(args):
         input_names = ['input_cpf', 'input_sv']
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1, dummy_input_2), "%s/gnn.onnx"%args.outdir, verbose=True,
-                          input_names = input_names, output_names = output_names)
+                          input_names = input_names, output_names = output_names,
+                          dynamic_axes = {input_names[0]: {0: 'batch_size'}, 
+                                          input_names[1]: {0: 'batch_size'}, 
+                                          output_names[0]: {0: 'batch_size'}})
+                                      
     
     else: 
         out_test = gnn(dummy_input_1)
         input_names = ['input_cpf']
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1), "%s/gnn.onnx"%args.outdir, verbose=True,
-                          input_names = input_names, output_names = output_names)
+                          input_names = input_names, output_names = output_names,
+                          dynamic_axes = {input_names[0]: {0: 'batch_size'}, 
+                                          output_names[0]: {0, 'batch_size'}})
     
 
     # Load the ONNX model
@@ -120,6 +125,26 @@ def main(args):
     # Print a human readable representation of the graph
     print(onnx.helper.printable_graph(model.graph))
 
+    ort_session = ort.InferenceSession("%s/gnn.onnx"%args.outdir)
+    
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    # compute ONNX Runtime output prediction
+    ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(dummy_input_1),
+                  ort_session.get_inputs()[1].name: to_numpy(dummy_input_2)}
+    ort_outs = ort_session.run(None, ort_inputs)
+    
+    print('PyTorch:', out_test)
+    print('ONNXRuntime:', ort_outs)
+    # compare ONNX Runtime and PyTorch results
+    np.testing.assert_allclose(to_numpy(out_test), ort_outs[0], rtol=1e-03, atol=1e-05)
+    
+    print("Exported model has been tested with ONNXRuntime, and the result looks good!")
+
+    sys.exit()
+
+    from onnx_tf.backend import prepare
     #warnings.filterwarnings('ignore') # Ignore all the warning messages in this tutorial
     tf_rep = prepare(model) # Import the ONNX model to Tensorflow
     print(tf_rep.inputs) # Input nodes to the model
@@ -145,8 +170,18 @@ def main(args):
             y = sess.graph.get_tensor_by_name('import/input_sv:0')
             out = sess.graph.get_tensor_by_name('import/add_33:0')
             feed_dict = {x:test[0:batch_size], y:test_sv[0:batch_size]}
-
             classification = sess.run(out, feed_dict)
+
+            cpf_zeros = np.zeros([1, 60, 30])
+            sv_zeros = np.zeros([1, 5, 14])
+
+            with g_in.as_default():
+                #sess.run(tf.global_variables_initializer())                                                                              
+                result = sess.run(out, feed_dict={x: cpf_zeros, y: sv_zeros},
+                                  options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE),
+                                  run_metadata=run_metadata)
+                flops = tf.profiler.profile(graph, options = tf.profiler.ProfileOptionBuilder.float_operation(),run_meta=run_metadata)
+                print('FLOP after freezing', flops.total_float_ops)
 
             # make variables constant (seems to be unnecessary)
             
@@ -166,9 +201,8 @@ def main(args):
             #print('saved the graph definition in pb format at: ', os.path.join('./', f))
             
 
-    print("pytorch\n",out_test)
-    #print("tensorflow\n",output)
-    print("tensorflow\n",classification)
+    print("PyTorch:",out_test)
+    print("TensorFlow:",classification)
     
     
 if __name__ == "__main__":
@@ -181,9 +215,9 @@ if __name__ == "__main__":
     parser.add_argument("vv_branch", help="Required positional argument")
     
     # Optional arguments
-    parser.add_argument("--De", type=int, action='store', dest='De', default = 5, help="De")
-    parser.add_argument("--Do", type=int, action='store', dest='Do', default = 6, help="Do")
-    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
+    parser.add_argument("--De", type=int, action='store', dest='De', default = 20, help="De")
+    parser.add_argument("--Do", type=int, action='store', dest='Do', default = 24, help="Do")
+    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 60, help="hidden")
 
     args = parser.parse_args()
     main(args)

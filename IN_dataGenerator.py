@@ -17,8 +17,8 @@ import argparse
 print(torch.__version__)
 
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
-test_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
-train_path = '/bigdata/shared/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
+test_path = '/storage/group/gpu/bigdata/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_test/'
+train_path = '/storage/group/gpu/bigdata/BumbleB/convert_20181121_ak8_80x_deepDoubleB_db_pf_cpf_sv_dl4jets_train_val/'
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
@@ -123,9 +123,7 @@ def main(args):
                    De=args.De,
                    Do=args.Do)
     else: 
-        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
-                       sv_branch=int(sv_branch),
-                       vv_branch=int(vv_branch),
+        gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden,
                        De=args.De,
                        Do=args.Do)
         
@@ -152,6 +150,7 @@ def main(args):
     
     from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score
     softmax = torch.nn.Softmax(dim=1)
+    import time
 
     for m in range(n_epochs):
         print("Epoch %s\n" % m)
@@ -161,7 +160,7 @@ def main(args):
         loss_val = []
         loss_training = []
         correct = []
-    
+        tic = time.perf_counter()
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_train.generate_data(),total=n_train/batch_size):
             training = sub_X[2]
             training_sv = sub_X[3]
@@ -185,7 +184,9 @@ def main(args):
             optimizer.step()
             loss_string = "Loss: %s" % "{0:.5f}".format(l.item())
             del trainingv, trainingv_sv, targetv
-        
+        toc = time.perf_counter()
+        print(f"Training done in {toc - tic:0.4f} seconds")
+        tic = time.perf_counter()
         for sub_X,sub_Y,sub_Z in tqdm.tqdm(data_val.generate_data(),total=n_val/batch_size):
             training = sub_X[2]
             training_sv = sub_X[3]
@@ -209,6 +210,8 @@ def main(args):
         
             correct.append(target)
             del trainingv, trainingv_sv, targetv
+        toc = time.perf_counter()
+        print(f"Evaluation done in {toc - tic:0.4f} seconds")
         
         l_val = np.mean(np.array(loss_val))
     
