@@ -80,15 +80,21 @@ def main(args):
         gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
                        vv_branch=int(args.vv_branch),
                        De=args.De,
-                       Do=args.Do)
+                       Do=args.Do,
+                       softmax=True)
     
     else:
         gnn = GraphNetnoSV(N, n_targets, len(params), args.hidden, 
                            De=args.De,
-                           Do=args.Do)
+                           Do=args.Do,
+                           softmax=True)
+    
     
     gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(args.outdir,label)))
     
+    torch.save(gnn.state_dict(),'%s/gnn_%s_best_onnx.pth'%(args.outdir,label))
+
+    print(gnn)
     batch_size = 1
     dummy_input_1 = torch.from_numpy(test[0:batch_size]).cuda()
     dummy_input_2 = torch.from_numpy(test_sv[0:batch_size]).cuda()
@@ -101,6 +107,8 @@ def main(args):
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1, dummy_input_2), "%s/gnn.onnx"%args.outdir, verbose=True,
                           input_names = input_names, output_names = output_names,
+                          export_params=True,        # store the trained parameter weights inside the model file
+                          opset_version=11,          # the ONNX version to export the model to
                           dynamic_axes = {input_names[0]: {0: 'batch_size'}, 
                                           input_names[1]: {0: 'batch_size'}, 
                                           output_names[0]: {0: 'batch_size'}})
@@ -112,6 +120,8 @@ def main(args):
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1), "%s/gnn.onnx"%args.outdir, verbose=True,
                           input_names = input_names, output_names = output_names,
+                          export_params=True,        # store the trained parameter weights inside the model file
+                          opset_version=11,          # the ONNX version to export the model to
                           dynamic_axes = {input_names[0]: {0: 'batch_size'}, 
                                           output_names[0]: {0, 'batch_size'}})
     

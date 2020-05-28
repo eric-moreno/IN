@@ -5,7 +5,7 @@ from torch.autograd.variable import *
 import torch.optim as optim
 
 class GraphNet(nn.Module):
-    def __init__(self, n_constituents, n_targets, params, hidden, n_vertices, params_v, vv_branch=False, De=5, Do=6):
+    def __init__(self, n_constituents, n_targets, params, hidden, n_vertices, params_v, vv_branch=False, De=5, Do=6, softmax=False):
         super(GraphNet, self).__init__()
         self.hidden = int(hidden)
         self.P = params
@@ -23,6 +23,7 @@ class GraphNet(nn.Module):
         self.assign_matrices()
         self.assign_matrices_SV()
         self.vv_branch = vv_branch
+        self.softmax = softmax
         if self.vv_branch:
             self.assign_matrices_SVSV()
         
@@ -168,6 +169,9 @@ class GraphNet(nn.Module):
         else:
             N = self.fc_fixed(N)
 
+        if self.softmax:
+            N = nn.Softmax(dim=-1)(N)
+
         return N 
             
     def tmul(self, x, y):  #Takes (I * J * K)(K * L) -> I * J * L 
@@ -262,7 +266,7 @@ class GraphNetAdv(GraphNet):
 
 # Architecture that excludes Secondary Vertices branch from Interaction network
 class GraphNetnoSV(nn.Module):
-    def __init__(self, n_constituents, n_targets, params, hidden, De=5, Do=6):
+    def __init__(self, n_constituents, n_targets, params, hidden, De=5, Do=6, softmax=False):
         super(GraphNetnoSV, self).__init__()
         self.hidden = int(hidden)
         self.P = params
@@ -337,6 +341,9 @@ class GraphNetnoSV(nn.Module):
         ### Classification MLP ###
 
         N = self.fc_fixed(N)
+
+        if softmax:
+            N = nn.Softmax(dim=-1)(N)
 
         return N 
             
