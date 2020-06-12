@@ -28,22 +28,22 @@ class GraphNet(nn.Module):
         
         self.Ra = torch.ones(self.Dr, self.Nr)
         self.fr1 = nn.Linear(2 * self.P + self.Dr, self.hidden).cuda()
-        self.fr2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-        self.fr3 = nn.Linear(int(self.hidden/2), self.De).cuda()
+        self.fr2 = nn.Linear(self.hidden, int(self.hidden)).cuda()
+        self.fr3 = nn.Linear(int(self.hidden), self.De).cuda()
         self.fr1_pv = nn.Linear(self.S + self.P + self.Dr, self.hidden).cuda()
-        self.fr2_pv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-        self.fr3_pv = nn.Linear(int(self.hidden/2), self.De).cuda()
+        self.fr2_pv = nn.Linear(self.hidden, int(self.hidden)).cuda()
+        self.fr3_pv = nn.Linear(int(self.hidden), self.De).cuda()
         if self.vv_branch:
             self.fr1_vv = nn.Linear(2 * self.S + self.Dr, self.hidden).cuda()
-            self.fr2_vv = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-            self.fr3_vv = nn.Linear(int(self.hidden/2), self.De).cuda()
+            self.fr2_vv = nn.Linear(self.hidden, int(self.hidden)).cuda()
+            self.fr3_vv = nn.Linear(int(self.hidden), self.De).cuda()
         self.fo1 = nn.Linear(self.P + self.Dx + (2 * self.De), self.hidden).cuda()
-        self.fo2 = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-        self.fo3 = nn.Linear(int(self.hidden/2), self.Do).cuda()
+        self.fo2 = nn.Linear(self.hidden, int(self.hidden)).cuda()
+        self.fo3 = nn.Linear(int(self.hidden), self.Do).cuda()
         if self.vv_branch:
             self.fo1_v = nn.Linear(self.S + self.Dx + (2 * self.De), self.hidden).cuda()
-            self.fo2_v = nn.Linear(self.hidden, int(self.hidden/2)).cuda()
-            self.fo3_v = nn.Linear(int(self.hidden/2), self.Do).cuda()
+            self.fo2_v = nn.Linear(self.hidden, int(self.hidden)).cuda()
+            self.fo3_v = nn.Linear(int(self.hidden), self.Do).cuda()
 
         if self.vv_branch:
             #self.fc_1 = nn.Linear(2*self.Do, self.Do).cuda()
@@ -353,9 +353,9 @@ class GraphNetnoSV(nn.Module):
 
 #Architecture that includes neutral pfcandidates - not enabled by default
 
-class GraphNetNeutral(nn.Module):
+class GraphNetAllParticle(nn.Module):
     def __init__(self, n_constituents_charged, n_constituents_neutral, n_targets, params_charged, params_neutral, hidden, n_vertices, params_v, sv_branch=True, vv_branch=False, nn_branch=False, De=5, Do=6):
-        super(GraphNetNeutral, self).__init__()
+        super(GraphNetAllParticle, self).__init__()
         self.hidden = int(hidden)
         self.P = params_charged
         self.N = n_constituents_charged

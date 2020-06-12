@@ -167,14 +167,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
     
     def plot_rocs_with_DDT(dfs=[], savedir="", names=[], sigs=[["Hcc"]], bkgs=[["Hbb"]], norm=False, plotname="", DDT_results = [[],[]]):
         f, ax = plt.subplots(figsize=(10, 10))
-        colors = ['blue', 'orange', 'green']
-        line_styles = ['-', '--', '-.' , '-', '--']
+        colors = ['C0', 'C6', 'C1', 'C2', ]
+        line_styles = ['-', '--', '-.' , ':', '--']
         line_widths = [2.5, 2.5, 2.5, 3, 2.5]
         for frame, name, sig, bkg, color, style, width in zip(dfs, names, sigs, bkgs, colors, line_styles, line_widths):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
             fpr, tpr, threshold = roc_curve(truth, predict)
             
-            if color not in ['navy', 'cornflowerblue', 'orange', 'green']:
+            if color not in ['C6', 'C1', 'C2']:
                 
                 ax.plot(tpr, fpr, lw=width, color=color, linestyle = style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
                 ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
@@ -184,13 +184,13 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
          
-        ax.plot(DDT_results[0][0], DDT_results[1], lw=2.5, color='deepskyblue', linestyle = ':', label="{}, AUC = {:.1f}\%".format('Interaction network, DDT',auc(DDT_results[1],DDT_results[0][0])*100))
+        ax.plot(DDT_results[0][0], DDT_results[1], lw=2.5, color='C3', linestyle = '-', label="{}, AUC = {:.1f}\%".format('Interaction network, DDT',auc(DDT_results[1],DDT_results[0][0])*100))
         
         for frame, name, sig, bkg, color, style, width in zip(dfs, names, sigs, bkgs, colors, line_styles, line_widths):
             truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
             fpr, tpr, threshold = roc_curve(truth, predict)
             
-            if color in ['green']:
+            if color in ['C2']:
                 ax.plot(tpr, fpr, lw=width, color=color, linestyle=style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
                 ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
                 for ind in range(len(tpr)):
@@ -199,9 +199,20 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
         
-                ax.plot(DDT_results[0][2], DDT_results[1], lw=2.5, color='lime', linestyle = '-.', label="{}, AUC = {:.1f}\%".format('Deep double-b+, DDT',auc(DDT_results[1],DDT_results[0][2])*100))
+                ax.plot(DDT_results[0][3], DDT_results[1], lw=2.5, color='C5', linestyle = ':', label="{}, AUC = {:.1f}\%".format('Deep double-b+, DDT',auc(DDT_results[1],DDT_results[0][3])*100))
+            
+            if color in ['C6']:
+                ax.plot(tpr, fpr, lw=width, color=color, linestyle=style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
+                ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
+                for ind in range(len(tpr)):
+                                ROCtext.write(str(tpr[ind])+'\t'+str(fpr[ind])+'\n')
+                ROCtext.close()
+
+                print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
         
-            if color in ['orange']:
+                ax.plot(DDT_results[0][1], DDT_results[1], lw=2.5, color='C7', linestyle = '--', label="{}, AUC = {:.1f}\%".format('All-particle interaction network, DDT',auc(DDT_results[1],DDT_results[0][1])*100))
+            
+            if color in ['C1']:
                 ax.plot(tpr, fpr, lw=width, color=color, linestyle=style, label="{}, AUC = {:.1f}\%".format(name,auc(fpr,tpr)*100))
                 ROCtext=open(os.path.join(savedir, "ROCComparison_"+"+".join(sig)+"_vs_"+"+".join(bkg)+".txt"),'w')
                 for ind in range(len(tpr)):
@@ -211,7 +222,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 print("{}, AUC={}%".format(name, auc(fpr,tpr)*100), "Sig:", sig, "Bkg:", bkg)
         
                 
-                ax.plot(DDT_results[0][1], DDT_results[1], lw=2.5, color='orangered', linestyle = '--', label="{}, AUC = {:.1f}\%".format('Deep double-b, DDT',auc(DDT_results[1],DDT_results[0][1])*100))
+                ax.plot(DDT_results[0][2], DDT_results[1], lw=2.5, color='C4', linestyle = '-.', label="{}, AUC = {:.1f}\%".format('Deep double-b, DDT',auc(DDT_results[1],DDT_results[0][2])*100))
         
         ax.set_xlim(0,1)
         ax.set_ylim(0.001,1)
@@ -268,13 +279,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         else: 
             aux_scale = 0.1*float(FPR_cut)/100.
             
-        model = GradientBoostingRegressor(loss='quantile', alpha= float(FPR_cut)/100, 
-                                          n_estimators=300, 
-                                          min_samples_leaf=3, min_samples_split=3, 
-                                          max_depth=5, 
-                                          validation_fraction=0.05, 
-                                          n_iter_no_change=5, tol=1e-3, 
-                                          verbose=1)
+        model = GradientBoostingRegressor(loss='quantile', alpha=1-float(FPR_cut)/100, 
+                                          n_estimators=500, 
+                                          min_samples_leaf=50, 
+                                          min_samples_split=2500, 
+                                          max_depth = 5, 
+                                          validation_fraction=0.2, 
+                                          n_iter_no_change=10, tol=1e-3, 
+                                          verbose=1, random_state=42)
         model.fit(data_train, dfs.loc[dfs['truth'+'QCD'] == 1]['predict'+'Hbb'].values/aux_scale)
         cuts = aux_scale*model.predict(data)
         return cuts
@@ -291,13 +303,14 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         else: 
             aux_scale = 0.1*float(TPR_cut)/100.
             
-        model = GradientBoostingRegressor(loss='quantile', alpha= 1-float(TPR_cut)/100, 
-                                          n_estimators=300, 
-                                          min_samples_leaf=3, min_samples_split=3, 
+        model = GradientBoostingRegressor(loss='quantile', alpha=float(TPR_cut)/100, 
+                                          n_estimators=500, 
+                                          min_samples_leaf=50,   
+                                          min_samples_split=2500, 
                                           max_depth=5, 
-                                          validation_fraction=0.1, 
-                                          n_iter_no_change=5, tol=1e-3, 
-                                          verbose=1)
+                                          validation_fraction=0.2, 
+                                          n_iter_no_change=10, tol=1e-3,
+                                          verbose=1, random_state=42)
         model.fit(data_train, dfs.loc[dfs['truth'+'Hbb'] == 1]['predict'+'Hbb'].values/aux_scale)
         cuts = aux_scale*model.predict(data)
         return cuts
@@ -338,12 +351,13 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
 
         # Specifically ordered in this method for paper
         dfs.insert(1, dfs[0])
-        dfs.insert(3, dfs[1])
-        dfs.insert(5, dfs[2])
+        dfs.insert(3, dfs[2])
+        dfs.insert(5, dfs[4])
         temp_names = np.copy(names)
-        temp_names = np.insert(temp_names, 1, 'IN, DDT')
+        temp_names = np.insert(temp_names, 1, 'Interaction network, DDT')
         temp_names = np.insert(temp_names, 3, 'Deep double-b, DDT')
         temp_names = np.insert(temp_names, 5, 'Deep double-b+, DDT')
+        temp_names = ['Interaction network','Interaction network, DDT', 'Deep double-b', 'Deep double-b, DDT','Deep double-b+','Deep double-b+, DDT']
         for i in range(3):
             sigs.append('Hbb')
             bkgs.append('QCD')
@@ -354,9 +368,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         nbins = 8
         f, ax = plt.subplots(figsize=(10, 10))
         ax.loglog()
-        line_styles = [':', ':', '--', '-', '-', '-.']
+        line_styles = ['-', '-', '-.', '-.', ':', ':']
+        colors = ['C0', 'C3', 'C1', 'C4', 'C2', 'C5']
         counter = -1
-        for frame, name, sig, bkg, color, style in zip(dfs, temp_names, sigs, bkgs, colors, line_styles):
+        for frame, name, sig, bkg, col, style in zip(dfs, temp_names, sigs, bkgs, colors, line_styles):
             
             if name in ['Interaction network', 'Deep double-b', 'Deep double-b+']:
                 
@@ -368,7 +383,9 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 cuts = {}
                 jsd_plot = []
                 eb_plot = []
-                for wp,marker in zip([0.5,0.9,0.95],['^','s','o','v']): # % signal eff.
+                
+                for wp,marker in zip([0.5,0.9,0.95],['^','s','o','v']): # % signal eff
+                    
                     idx, val = find_nearest(tpr, wp)
                     cuts[str(wp)] = threshold[idx] # threshold for deep double-b corresponding to ~1% mistag rate
 
@@ -400,9 +417,9 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     print('eS = %.2f%%, eB = %.2f%%, 1/eB=%.2f, jsd = %.2f, 1/jsd = %.2f'%(tpr[idx]*100,fpr[idx]*100,1/fpr[idx],jsd,1/jsd))
                     eb_plot.append(1/fpr[idx])
                     jsd_plot.append(1/jsd)
-                    ax.plot([1/fpr[idx]],[1/jsd],marker=marker,markersize=12,color=color)
+                    ax.plot([1/fpr[idx]],[1/jsd],marker=marker,markersize=12,color=col)
                    
-            elif name in ['IN, DDT', 'Deep double-b, DDT', 'Deep double-b+, DDT']:
+            elif name in ['Interaction network, DDT', 'Deep double-b, DDT', 'Deep double-b+, DDT']:
                 
                 counter += 1
                 truth, predict, db =  roc_input(frame, signal=sig, include = sig+bkg, norm=norm)
@@ -413,10 +430,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 
                 jsd_plot = []
                 eb_plot = []
-                
+                    
                 for wp,marker in zip([50.,90.,95.],['^','s','o', 'v']): # % signal eff.
+                    
                     idx, val = find_nearest(tpr, wp/100)
-                    cuts = quantile_regression_DDT_FPR(cut(frame), cut(frame), 1+wp)           
+                    cuts = quantile_regression_DDT_FPR(cut(frame), cut(frame), wp)           
                     mask_pass = (frame['predict'+sig[0]] > cuts) & frame['truth'+bkg[0]]
                     mask_fail = (frame['predict'+sig[0]] < cuts) & frame['truth'+bkg[0]]
                     
@@ -450,11 +468,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     
                     eb_plot.append(FPR_wp)
                     jsd_plot.append(1/jsd)
-                    ax.plot([FPR_wp],[1/jsd],marker=marker,markersize=12,color=color)
+                    ax.plot([FPR_wp],[1/jsd],marker=marker,markersize=12,color=col)
                     
              
                    
-            ax.plot(eb_plot,jsd_plot,linestyle=style,label=name,color=color)
+            ax.plot(eb_plot,jsd_plot,linestyle=style,label=name,color=col)
         
         ax.set_xlim(1,2e3)
         ax.set_ylim(1,1e9)
@@ -700,17 +718,6 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             idx = (np.abs(array-value)).argmin()
             return idx, array[idx]
 
-        if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
-            legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
-            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
-        else:
-            legend_siglab = siglab
-        if sculp_label[0] in ["H", "Z", "g"] and len(sculp_label) == 3:
-            legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
-            legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
-        else: legend_bkglab = sculp_label
-
-
         # Placing events in bins to detemine threshold for each individual bin
 
         ctdf = tdf.copy()
@@ -741,22 +748,9 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         bins = np.linspace(40,200,NBINS+1)
 
         correct = sum(weight)
-        if siglab == sculp_label: return 
         def find_nearest(array,value):
             idx = (np.abs(array-value)).argmin()
             return idx, array[idx]
-
-        if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
-            legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
-            legend_siglab = '$\mathrm{}$'.format('{'+legend_siglab+'}')
-        else:
-            legend_siglab = siglab
-        if sculp_label[0] in ["H", "Z", "g"] and len(sculp_label) == 3:
-            legend_bkglab = '{} \\rightarrow {}'.format(sculp_label[0], sculp_label[-2]+'\\bar{'+sculp_label[-1]+'}') 
-            legend_bkglab = '$\mathrm{}$'.format('{'+legend_bkglab+'}')
-        else: legend_bkglab = sculp_label
-
-
         # Placing events in bins to detemine threshold for each individual bin
 
         ctdf = tdf.copy()
@@ -769,7 +763,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         weight = ctdf['truth'+'QCD'].values
         selected = sum(weight) 
         
-        return(float(selected)/correct)
+        return(float(selected)/(correct))
     
     def DDT_Accuracy(tdf, TPR_cut=50, siglab="Hbb", sculp_label='Light', sig = ['Hbb'], bkg = ["QCD"], savedir="", taggerName=""): 
         
@@ -1015,8 +1009,9 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             idx = (np.abs(array-value)).argmin()
             return idx, array[idx]
         
-        line_styles = ['-', '-.', '--', '--', '-.']
+        line_styles = ['-', '-.', ':', '-', '-.', ':']
         line_widths = [2.5, 2.5, 3, 2.5, 2.5]
+        colors = [['C0', 'C3'], ['C1', 'C4'], ['C2', 'C5']]
         
         if siglab[0] in ["H", "Z", "g"] and len(siglab) == 3:
             legend_siglab = '{} \\rightarrow {}'.format(siglab[0], siglab[-2]+'\\bar{'+siglab[-1]+'}') 
@@ -1029,7 +1024,7 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
         else: legend_bkglab = sculp_label
         
         f, ax = plt.subplots(figsize=(10,10))
-        for tdf, name, style, width in zip(tdf_array, names_array, line_styles, line_widths):
+        for tdf, name, style, width, col in zip(tdf_array, names_array, line_styles, line_widths, colors):
            
             # Specify taggers that require DDT decorrelation here
             if name in ['Interaction network', 'Deep double-b', 'Deep double-b+']: 
@@ -1052,11 +1047,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                     if str(wp) == '1.0' and name in ['Interaction network']:
                         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), 
                             linestyle='-', lw=4, normed=False,
-                            histtype='stepfilled',label='No tagging applied', alpha=0.3)
+                            histtype='stepfilled',label='No tagging applied', alpha=0.3, color='C9')
                         
                     elif str(wp) != '1.0':   
                         ax.hist(ctdf['fj_sdmass'].values, bins=bins, weights = weight/float(np.sum(weight)), lw=width, linestyle = style,    
-                                normed=False, histtype='step',label=' {}'.format(name))
+                                normed=False, color=col[0], histtype='step',label=' {}'.format(name))
 
                 ctdf = tdf.copy()
                 ctdf = ctdf.head(0)
@@ -1080,7 +1075,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                             normed=False,
                             histtype='step',
                             linestyle = style, 
-                            label='{}'.format(name + ', DDT')
+                            label='{}'.format(name + ', DDT'),
+                            color = col[1]
                            )
             else: 
                 truth, predict, db = roc_input(tdf, signal=[siglab], include = [siglab, 'QCD'])
@@ -1512,11 +1508,11 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             fpr, tpr, threshold = roc_curve(truth, predict)
             return fpr, tpr
         
-        line_styles = ['-', '-.', ':', '--', '-.']
+        line_styles = ['-', '-.', ':']
         line_widths = [2.5, 2.5, 3, 2.5, 2.5]
-        
+        colors = [['C0', 'C3'], ['C1', 'C4'], ['C2', 'C5']]
         f, ax = plt.subplots(figsize=(10,10))
-        for xdf, taggerName, style, width in zip(tdf_array, names_array, line_styles, line_widths):
+        for xdf, taggerName, style, width, col in zip(tdf_array, names_array, line_styles, line_widths, colors):
         
          
             step = 5
@@ -1541,8 +1537,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             pts = np.concatenate((pts, np.array([50])))
 
             efftight = [efftight[0]] + efftight + [efftight[-1]]
-            ax.step(pts, efftight, lw=width, label=taggerName, linestyle=style)
-            '''
+            ax.step(pts, efftight, lw=width, color = col[0], label=taggerName, linestyle=style)
+            
             if taggerName in ['Interaction network', 'Deep double-b', 'Deep double-b+']:
                 
                 step = 5
@@ -1562,8 +1558,8 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
                 pts = np.concatenate((pts, np.array([50])))
 
                 efftight = [efftight[0]] + efftight + [efftight[-1]]
-                ax.step(pts, efftight, lw=width, label=taggerName + ', DDT', linestyle='-')   
-            '''
+                ax.step(pts, efftight, lw=width, color = col[1], label=taggerName + ', DDT', linestyle=style)   
+            
         
         ax.set_xlabel(r'Reconstructed primary vertices', ha='right', x=1.0)
        
@@ -1836,9 +1832,10 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
               sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb']],
               bkgs=[['QCD'],['QCD'],['QCD'],['QCD']])
     
+    
     tdf_train = cut(cutrho(tdf_train))
     
-    FPR_range = np.logspace(-1, 1.9999999999, 20)
+    FPR_range = np.logspace(-1, 1.9999999, 4)
     TPR_range = [] 
     
     for frame,savedir,taggerName in zip([dataframes[i] for i in [0, 1, 2]],savedirs,taggerNames):
@@ -1852,10 +1849,17 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
             TPR_range_frame.append(make_TPR_DDT(cut(cutrho(frame)), FPR_range[FPR], siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName)) 
         TPR_range.append(TPR_range_frame)
         
-        #print(DDT_Accuracy(cut(cutrho(frame)), 50, sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
+        #print(make_TPR_DDT(cut(cutrho(frame)), 1, siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
         
-    FPR_range = [float(FPR_range[FPR])/100 for FPR in range(len(FPR_range))]
+        #print(1/make_FPR_DDT(cut(cutrho(frame)), 30, siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
+        
+        #print(make_FPR_DDT(cut(cutrho(frame)), 50, siglab='QCD', sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
+        
+        #print(DDT_Accuracy(cut(cutrho(frame)), 50, sculp_label='fj_sdmass', savedir=savedir, taggerName=taggerName))
+
     
+    FPR_range = [float(FPR_range[FPR])/100 for FPR in range(len(FPR_range))]
+        
     plot_rocs_with_DDT(dfs=[cut(cutrho(frame)) for frame in dataframes],
               savedir=os.path.join(outputDir,'Plots'),
               names=taggerNames,
@@ -1868,12 +1872,12 @@ def make_plots(outputDir, dataframes, tdf_train, savedirs=["Plots"], taggerNames
              sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
              bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
     
-    #plot_jsd_sig(dfs=[cut(cutrho(frame)) for frame in dataframes],
-    #         savedir=os.path.join(outputDir,'Plots'),
-    #         names=taggerNames,
-    #         sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
-    #         bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
-
+    plot_jsd_sig(dfs=[cut(cutrho(frame)) for frame in dataframes],
+             savedir=os.path.join(outputDir,'Plots'),
+             names=taggerNames,
+             sigs=[['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb'],['Hbb']],
+             bkgs=[['QCD'],['QCD'],['QCD'],['QCD'],['QCD'],['QCD']])
+    
     sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='QCD', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)
     
     sculpting_multiple_taggers([cut(cutrho(frame)) for frame in dataframes], taggerNames, siglab='Hbb', sculp_label='Hbb', savedir=os.path.join(outputDir,'Plots'), sculpt_wp = 0.01)  
@@ -1923,6 +1927,10 @@ def main(args):
     prediction_in = np.load('%s/prediction_new.npy'%(args.indir))
     df_in['predictHbb'] = prediction_in[:,1]
     df_in['predictQCD'] = prediction_in[:,0]
+    #df_in_neu = df.copy(deep=True)
+    #prediction_in_neu = np.load('%s/prediction_new.npy'%(args.inneudir))
+    #df_in_neu['predictHbb'] = prediction_in_neu[:,1]
+    #df_in_neu['predictQCD'] = prediction_in_neu[:,0]
     
     ### Removed in favor of DDT decorrelation method ###
     #df_in_adv = df.copy(deep=True)
@@ -1999,11 +2007,12 @@ def main(args):
     #plot_loss(args.indir,args.outdir, taggerName="Interaction network", eraText=r'2016 (13 TeV)')W
     #plot_loss(args.indecdir,args.outdir, taggerName="Interaction network mass decor.", eraText=r'2016 (13 TeV)')
     
+    ''
     
     make_plots(evalDir,
                [df_in, df,df_plus], df_in_train,
-               savedirs=["Plots/IN", "Plots/DDB","Plots/DDB_plus"],
-               taggerNames=["Interaction network", "Deep double-b", "Deep double-b+"],
+               savedirs=["Plots/IN", "Plots/IN_neu","Plots/DDB","Plots/DDB_plus"],
+               taggerNames=["Interaction network","All-particle interaction network","Deep double-b", "Deep double-b+"],
                eraText=r'2016 (13 TeV)')
     
     print('made plots')
@@ -2014,6 +2023,7 @@ if __name__ == "__main__":
     
     # Required positional arguments
     parser.add_argument("indir", help="IN results dir")
+    #parser.add_argument("inneudir", help="IN all-particle results dir")
     #parser.add_argument("inadvdir", help="IN adversarial results dir")
     #parser.add_argument("inrwgtdir", help="IN QCD reweight results dir")
     parser.add_argument("-o", "--outdir", action='store', dest='outdir', default = 'IN_Run2', help="outdir")

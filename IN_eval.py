@@ -211,7 +211,7 @@ def main(args, save_path='', evaluating_test=True):
     print(target_test.shape)
     print(test_spec.shape)
     print(target_test.shape)
-  
+    
     #Convert two sets into two branch with one set in both and one set in only one (Use for this file)
     test_np = test_1
     test = test_2
@@ -233,10 +233,10 @@ def main(args, save_path='', evaluating_test=True):
     
     from gnn import GraphNetnoSV
     from gnn import GraphNet
-    from gnn import GraphNetNeutral 
+    from gnn import GraphNetAllParticle 
     
     if sv_branch: 
-        gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+        gnn = GraphNetNeutral(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
                    vv_branch=int(vv_branch),
                    De=args.De,
                    Do=args.Do)
@@ -250,7 +250,7 @@ def main(args, save_path='', evaluating_test=True):
     
     
     gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(outdir,label)))
-
+    print(sum(p.numel() for p in gnn.parameters() if p.requires_grad))
     softmax = torch.nn.Softmax(dim=1)
     
     if sv_branch: 

@@ -139,7 +139,7 @@ def main(args):
     # Three implementations of IN with GraphNet being default
     from gnn import GraphNetnoSV
     from gnn import GraphNet
-    from gnn import GraphNetNeutral
+    from gnn import GraphNetAllParticle
     
     if sv_branch: 
         gnn = GraphNet(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
@@ -152,7 +152,10 @@ def main(args):
                        vv_branch=int(vv_branch),
                        De=args.De,
                        Do=args.Do)
-        
+    
+    #Architecture with all-particles
+    #gnn = GraphNetAllParticle(N, N_neu, n_targets, len(params), len(params_neu), args.hidden, N_sv, len(params_sv),vv_branch=int(vv_branch), De=args.De, Do=args.Do) 
+    
     # pre load best model
     #gnn.load_state_dict(torch.load('out/gnn_new_best.pth'))
 
