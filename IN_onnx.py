@@ -7,7 +7,8 @@ import onnxruntime as ort
 import warnings
 import os
 import sys
-    
+import time
+
 N = 60 # number of charged particles
 N_sv = 5 # number of SVs 
 n_targets = 2 # number of classes
@@ -90,7 +91,7 @@ def main(args):
                            softmax=True)
     
     
-    gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(args.outdir,label)))
+    gnn.load_state_dict(torch.load('%s/gnn_%s_best.pth'%(args.outdir,label), map_location=torch.device('cpu')))
     
     torch.save(gnn.state_dict(),'%s/gnn_%s_best_onnx.pth'%(args.outdir,label))
 
@@ -102,7 +103,9 @@ def main(args):
     #dummy_input_2 = torch.randn(32, 14, 5, device='cuda')
 
     if args.sv_branch: 
+        tic = time.perf_counter()
         out_test = gnn(dummy_input_1, dummy_input_2)
+        toc = time.perf_counter()
         input_names = ['input_cpf', 'input_sv']
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1, dummy_input_2), "%s/gnn.onnx"%args.outdir, verbose=True,
@@ -115,7 +118,9 @@ def main(args):
                                       
     
     else: 
+        tic = time.perf_counter()
         out_test = gnn(dummy_input_1)
+        toc = time.perf_counter()
         input_names = ['input_cpf']
         output_names = ['output1']
         torch.onnx.export(gnn, (dummy_input_1), "%s/gnn.onnx"%args.outdir, verbose=True,
@@ -125,6 +130,7 @@ def main(args):
                           dynamic_axes = {input_names[0]: {0: 'batch_size'}, 
                                           output_names[0]: {0, 'batch_size'}})
     
+    print(f"PyTorch Inference in {toc - tic:0.4f} seconds")
 
     # Load the ONNX model
     model = onnx.load("%s/gnn.onnx"%args.outdir)
@@ -139,11 +145,15 @@ def main(args):
     
     def to_numpy(tensor):
         return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
-
+        
     # compute ONNX Runtime output prediction
     ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(dummy_input_1),
                   ort_session.get_inputs()[1].name: to_numpy(dummy_input_2)}
+
+    tic = time.perf_counter()
     ort_outs = ort_session.run(None, ort_inputs)
+    toc = time.perf_counter()
+    print(f"ONNXRuntime Inference in {toc - tic:0.4f} seconds")
     
     print('PyTorch:', out_test)
     print('ONNXRuntime:', ort_outs)
@@ -152,7 +162,6 @@ def main(args):
     
     print("Exported model has been tested with ONNXRuntime, and the result looks good!")
 
-    sys.exit()
 
     from onnx_tf.backend import prepare
     #warnings.filterwarnings('ignore') # Ignore all the warning messages in this tutorial
@@ -168,7 +177,6 @@ def main(args):
     import tensorflow as tf
     tf.reset_default_graph()
     from tensorflow.python.platform import gfile
-    constDir = './'
     with tf.Session() as sess:
         with gfile.FastGFile(model_filename, 'rb') as f:
             graph_def = tf.GraphDef()
@@ -178,39 +186,13 @@ def main(args):
 
             x = sess.graph.get_tensor_by_name('import/input_cpf:0')
             y = sess.graph.get_tensor_by_name('import/input_sv:0')
-            out = sess.graph.get_tensor_by_name('import/add_33:0')
+            #out = sess.graph.get_tensor_by_name('import/add_33:0')
+            #out = sess.graph.get_tensor_by_name('import/Softmax_130:0')
+            out = sess.graph.get_tensor_by_name('import/output1:0')
             feed_dict = {x:test[0:batch_size], y:test_sv[0:batch_size]}
             classification = sess.run(out, feed_dict)
 
-            cpf_zeros = np.zeros([1, 60, 30])
-            sv_zeros = np.zeros([1, 5, 14])
-
-            with g_in.as_default():
-                #sess.run(tf.global_variables_initializer())                                                                              
-                result = sess.run(out, feed_dict={x: cpf_zeros, y: sv_zeros},
-                                  options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE),
-                                  run_metadata=run_metadata)
-                flops = tf.profiler.profile(graph, options = tf.profiler.ProfileOptionBuilder.float_operation(),run_meta=run_metadata)
-                print('FLOP after freezing', flops.total_float_ops)
-
-            # make variables constant (seems to be unnecessary)
-            
-            #from tensorflow.python.framework import graph_util
-            #from tensorflow.python.framework import graph_io
-
-            #pred_node_names = ['import/add_33']
-            #nonconstant_graph = tfsession.graph.as_graph_def()
-            #constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), pred_node_names)
-
-            #f = 'constantgraph.pb.ascii'
-            #tf.train.write_graph(constant_graph, './', f, as_text=True)
-            #print('saved the graph definition in ascii format at: ', os.path.join('./', f))
-
-            #f = 'constantgraph.pb'
-            #tf.train.write_graph(constant_graph, './', f, as_text=False)
-            #print('saved the graph definition in pb format at: ', os.path.join('./', f))
-            
-
+            sess.run(tf.global_variables_initializer())                                                                              
     print("PyTorch:",out_test)
     print("TensorFlow:",classification)
     
