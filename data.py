@@ -118,6 +118,22 @@ class Data(object):
                     yield [B[2].swapaxes(1,2), B[3].swapaxes(1,2)], C
             except StopIteration as si:
                 print ("start over generator loop")
+
+    def inf_generate_data_keras_db(self):
+        while True:
+            try:
+                for B, C, D in self.generate_data():
+                    yield [B[0], B[2].swapaxes(1,2)[:,:,22:], B[3].swapaxes(1,2)[:,:,11:13]], C
+            except StopIteration as si:
+                print ("start over generator loop")
+
+    def inf_generate_data_keras_cpf(self):
+        while True:
+            try:
+                for B, C, D in self.generate_data():
+                    yield [B[2].swapaxes(1,2)], C
+            except StopIteration as si:
+                print ("start over generator loop")
                 
     def generate_data(self):
        """Yields batches of training data until none are left."""

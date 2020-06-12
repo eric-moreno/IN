@@ -1,4 +1,4 @@
-from keras.layers import BatchNormalization, Conv1D, SpatialDropout1D, Dropout, Concatenate, Dense, Input, GRU
+from keras.layers import BatchNormalization, Conv1D, SpatialDropout1D, Dropout, Concatenate, Dense, Input, GRU, Flatten
 from keras.models import Model
 from keras.layers.advanced_activations import LeakyReLU
 
@@ -32,12 +32,12 @@ def model_DeepDoubleXReference(inputs, num_classes, datasets = ['cpf','sv'], hlf
 
     normalizedInputs = []
     for i in range(len(inputs)):
-        normedLayer = BatchNormalization(momentum=0.3,name = '%s_input_batchnorm'%datasets[i])(inputs[i])
+        normedLayer = BatchNormalization(momentum=0.3,axis=-1, name = '%s_input_batchnorm'%datasets[i])(inputs[i])
         normalizedInputs.append(normedLayer)
 
     flattenLayers = []
     if hlf_input is not None:
-        flattenLayers.append(normalizedInputs[hlf_input])
+        flattenLayers.append(Flatten()(normalizedInputs[hlf_input]))
         
     for i in range(len(inputs)):
         if i==hlf_input: continue
@@ -45,17 +45,20 @@ def model_DeepDoubleXReference(inputs, num_classes, datasets = ['cpf','sv'], hlf
         normalizedInput = normalizedInputs[i]
         x = Conv1D(filters=32*scale_hidden, kernel_size=(1,), strides=(1,), padding='same', 
                                 kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv1'%ds, 
-                                activation = 'relu')(normalizedInput)
+                                activation = 'relu', data_format='channels_last')(normalizedInput)
         x = SpatialDropout1D(rate=0.1)(x)
         x = Conv1D(filters=32*scale_hidden, kernel_size=(1,), strides=(1,), padding='same', 
                              kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv2'%ds, 
-                             activation = 'relu')(x)
+                             activation = 'relu', data_format='channels_last')(x)
         x = SpatialDropout1D(rate=0.1)(x)
         x = GRU(50*scale_hidden,go_backwards=True,implementation=2,name='%s_gru'%ds)(x)
         x = Dropout(rate=0.1)(x)
         flattenLayers.append(x)
 
-    concat = Concatenate()(flattenLayers)
+    if len(datasets)>1: 
+        concat = Concatenate()(flattenLayers)
+    else: 
+        concat = flattenLayers[0]
 
     fc = FC(concat, 100*scale_hidden, p=0.1, name='fc1')
     output = Dense(num_classes, activation='softmax', name='ID_pred', kernel_initializer=kernel_initializer_fc)(fc)
