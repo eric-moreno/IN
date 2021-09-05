@@ -236,7 +236,7 @@ def main(args, save_path='', evaluating_test=True):
     from gnn import GraphNetAllParticle 
     
     if sv_branch: 
-        gnn = GraphNetNeutral(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
+        gnn = GraphNetAllParticle(N, n_targets, len(params), args.hidden, N_sv, len(params_sv),
                    vv_branch=int(vv_branch),
                    De=args.De,
                    Do=args.Do)
